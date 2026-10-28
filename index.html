@@ -96,6 +96,17 @@ a.btn{text-decoration:none;color:inherit}
 .nav svg{width:20px;height:20px;flex:none}
 .nav:hover{color:var(--side-ink);background:rgba(255,255,255,.06)}
 .nav.on{color:var(--accent-ink);background:var(--accent)}
+.branchbox{margin:6px 4px 14px;display:flex;flex-direction:column;gap:4px}
+.branchbox .lbl{color:var(--side-muted)}
+.branchsel{width:100%;background:rgba(255,255,255,.08);color:var(--side-ink);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 10px;font-weight:600}
+.branchsel option{color:#111}
+.branchfix{color:var(--accent);font-weight:700;padding:2px 0}
+.topbar .branchsel{width:auto;max-width:150px;padding:5px 8px;font-size:13px}
+.pickbranch{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.pickbranch button{text-align:left;padding:18px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.pickbranch button:hover{border-color:var(--ink)}
+.pickbranch b{font-size:17px}
+.matrix td.q{text-align:right;white-space:nowrap}
 .whoami{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:2px;font-size:14px}
 .whoami .r{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .whoami button{margin-top:8px;align-self:flex-start;background:none;border:1px solid rgba(255,255,255,.2);color:var(--side-ink);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:13px}
@@ -308,7 +319,7 @@ const S = {
   co:{ orderType:'Dine-in', customer:'', discType:'none', discRef:'', discAmt:'', method:'Cash', payRef:'', tendered:'' },
   salesDate:null, salesCashier:'', salesQ:'', sales:[],
   rep:{ range:'today', from:null, to:null }, repData:null,
-  invTab:'stock'
+  invTab:'stock', branches:[], stock:[], branchSel:null
 };
 const app = document.getElementById('app');
 
@@ -385,6 +396,7 @@ const ICON = {
   menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v8a3 3 0 0 0 3 3v7M8 3v7M11 3v8a3 3 0 0 1-3 3"/><path d="M17 21V3c-2 1.5-3 4-3 7s1 4 3 4"/></svg>',
   reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   staff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 5.5 5.8"/></svg>',
+  branches:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l2-5h14l2 5"/><path d="M4 10v10h16V10"/><path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M10 20v-5h4v5"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>'
 };
 const VIEWS = {
@@ -394,6 +406,7 @@ const VIEWS = {
   menu:{ label:'Menu', roles:['admin'] },
   reports:{ label:'Reports', roles:['admin'] },
   staff:{ label:'Staff', roles:['admin'] },
+  branches:{ label:'Branches', roles:['admin'] },
   more:{ label:'More', roles:['admin','sales'], mobileOnly:true }
 };
 const viewLabel = v => (!isAdmin() && VIEWS[v].salesLabel) || VIEWS[v].label;
@@ -437,29 +450,63 @@ async function signOut(){ await sb.auth.signOut(); S.me = null; S.cart = []; loc
 
 /* ===================== data ===================== */
 async function loadCatalog(){
-  const [p, v, i, r, pr] = await Promise.all([
+  const [p, v, i, r, pr, br, st] = await Promise.all([
     q(sb.from('products').select('*').order('category').order('sort')),
     q(sb.from('variants').select('*').order('sort')),
     q(sb.from('inventory_items').select('*').order('name')),
     q(sb.from('recipes').select('*')),
-    q(sb.from('profiles').select('*').order('full_name'))
+    q(sb.from('profiles').select('*').order('full_name')),
+    q(sb.from('branches').select('*').order('name')),
+    q(sb.from('branch_stock').select('*'))
   ]);
-  S.products = p; S.variants = v; S.items = i; S.recipes = r; S.profiles = pr;
+  S.products = p; S.variants = v; S.items = i; S.recipes = r; S.profiles = pr; S.branches = br; S.stock = st;
 }
-async function refreshStock(){ S.items = await q(sb.from('inventory_items').select('*').order('name')); }
+async function refreshStock(){
+  const [i, st] = await Promise.all([ q(sb.from('inventory_items').select('*').order('name')), q(sb.from('branch_stock').select('*')) ]);
+  S.items = i; S.stock = st;
+}
 const variantsOf = pid => S.variants.filter(v => v.product_id === pid);
 const itemById = id => S.items.find(i => i.id === id);
+const branchById = id => S.branches.find(b => b.id === id);
+const branchName = id => branchById(id)?.name || '—';
+const activeBranches = () => S.branches.filter(b => b.active);
+/* current working branch: a number, or null when an admin views "All branches" */
+const curBranch = () => S.branchSel === 'all' ? null : S.branchSel;
+function stockOf(itemId, branchId = curBranch()){
+  const r = S.stock.find(x => x.item_id === itemId && x.branch_id === branchId);
+  return r || { branch_id:branchId, item_id:itemId, qty:0, reorder_level:itemById(itemId)?.default_reorder_level || 0 };
+}
 function servingsLeft(variantId){
+  const b = curBranch(); if (!b) return null;
   const rs = S.recipes.filter(r => r.variant_id === variantId);
   if (!rs.length) return null;
-  return Math.min(...rs.map(r => { const it = itemById(r.item_id); return it ? Math.floor(Number(it.qty) / Number(r.qty)) : Infinity; }));
+  return Math.min(...rs.map(r => Math.floor(Number(stockOf(r.item_id, b).qty) / Number(r.qty))));
 }
-function stockStatus(it){
-  const qn = Number(it.qty), rl = Number(it.reorder_level);
+function stockStatus(row){
+  const qn = Number(row.qty), rl = Number(row.reorder_level);
   if (qn <= 0) return ['Out','bad'];
   if (qn <= rl) return ['Low','warn'];
   return ['OK','good'];
 }
+function initBranch(){
+  if (!isAdmin()){ S.branchSel = S.me.branch_id; return; }
+  let saved = null; try { saved = localStorage.getItem('is_branch'); } catch(_){}
+  const ok = saved === 'all' || activeBranches().some(b => String(b.id) === saved);
+  S.branchSel = ok ? (saved === 'all' ? 'all' : Number(saved)) : (activeBranches().length === 1 ? activeBranches()[0].id : 'all');
+}
+function setBranch(v){
+  S.branchSel = v === 'all' ? 'all' : Number(v);
+  try { localStorage.setItem('is_branch', String(S.branchSel)); } catch(_){}
+  document.querySelectorAll('.branchsel').forEach(sel => sel.value = String(S.branchSel));
+  route();
+}
+function branchSelect(){
+  if (!isAdmin()) return `<span class="branchfix">${esc(branchName(S.me.branch_id))}</span>`;
+  return `<select class="branchsel" aria-label="Branch" data-change="branch">
+    <option value="all" ${S.branchSel==='all'?'selected':''}>All branches</option>
+    ${activeBranches().map(b => `<option value="${b.id}" ${S.branchSel===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select>`;
+}
+const branchLabel = () => curBranch() ? branchName(curBranch()) : 'All branches';
 
 /* ===================== shell ===================== */
 async function boot(){
@@ -470,6 +517,8 @@ async function boot(){
     if (!me || !me.active){ await sb.auth.signOut(); return showAuth('This account is deactivated. Ask the admin.'); }
     S.me = me;
     await loadCatalog();
+    if (me.role === 'sales' && !branchById(me.branch_id)?.active){ await sb.auth.signOut(); return showAuth('Your account has no active branch. Ask the admin to assign one.'); }
+    initBranch();
   } catch(e){ return showAuth('Could not load the POS: ' + errMsg(e)); }
   renderShell();
   route();
@@ -480,11 +529,12 @@ function renderShell(){
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand">Indiana Spice<small>POS · ${isAdmin()?'Admin':'Sales Officer'}</small></div>
+      <div class="branchbox"><span class="lbl">Branch</span>${branchSelect()}</div>
       ${desk.map(v => `<a class="nav" href="#${v}" data-nav="${v}">${ICON[v]}<span>${viewLabel(v)}</span></a>`).join('')}
       <div class="whoami"><span class="r">${isAdmin()?'Admin':'Sales Officer'}</span><b>${esc(S.me.full_name)}</b><span style="color:var(--side-muted)">@${esc(S.me.username)}</span>
         <button data-act="signout">Sign out</button></div>
     </aside>
-    <div class="topbar"><div class="brand">Indiana Spice</div><div class="who"><b>${esc(S.me.full_name)}</b>${isAdmin()?'Admin':'Sales Officer'}</div></div>
+    <div class="topbar"><div class="brand">Indiana Spice</div><div class="who">${isAdmin() ? branchSelect() : `<b>${esc(S.me.full_name)}</b>${esc(branchName(S.me.branch_id))}`}</div></div>
     <main id="main"></main>
     <nav class="tabbar">${mob.map(v => `<button data-nav="${v}">${ICON[v]}<span>${viewLabel(v)}</span></button>`).join('')}</nav>
   </div>`;
@@ -494,15 +544,21 @@ function route(){
   if (!canSee(v)) v = 'sell';
   if (v === 'more' && window.innerWidth > 860) v = 'sell';
   S.view = v;
-  document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === v || (v==='menu'||v==='staff') && b.dataset.nav==='more' && b.closest('.tabbar')));
+  document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === v || (v==='menu'||v==='staff'||v==='branches') && b.dataset.nav==='more' && b.closest('.tabbar')));
   const main = document.getElementById('main'); main.scrollTop = 0;
-  ({ sell:viewSell, sales:viewSales, inventory:viewInventory, menu:viewMenu, reports:viewReports, staff:viewStaff, more:viewMore })[v]();
+  ({ sell:viewSell, sales:viewSales, inventory:viewInventory, menu:viewMenu, reports:viewReports, staff:viewStaff, branches:viewBranches, more:viewMore })[v]();
 }
 window.addEventListener('hashchange', () => S.me && route());
 const main = () => document.getElementById('main');
 
 /* ===================== SELL ===================== */
 function viewSell(){
+  if (!curBranch()){
+    main().innerHTML = `<div class="page"><div class="page-head"><div><h1>Choose a branch</h1><div class="sub">Sales and stock are recorded per branch. Pick where this order is being sold.</div></div></div>
+      ${activeBranches().length ? `<div class="pickbranch">${activeBranches().map(b => `<button data-act="setbranch" data-v="${b.id}"><b>${esc(b.name)}</b><span class="muted">${esc(b.address || b.code)}</span></button>`).join('')}</div>`
+        : '<div class="card empty">No branches yet. Add one under Branches.</div>'}</div>`;
+    return;
+  }
   main().innerHTML = `<div class="sell">
     <section class="catalog">
       <div class="catbar">
@@ -541,7 +597,7 @@ function addToCart(variantId){
   const line = S.cart.find(l => l.variant_id === variantId);
   if (line) line.qty++; else S.cart.push({ variant_id:v.id, name:p.name, label:v.label, price:Number(v.price), qty:1 });
   const left = servingsLeft(variantId);
-  if (left !== null && (line?.qty || 1) > left) toast(`Heads up: stock shows only ${Math.max(left,0)} left for ${p.name}${v.label?' '+v.label:''}.`);
+  if (left !== null && (line?.qty || 1) > left) toast(left <= 0 ? `Heads up: ${p.name}${v.label?' '+v.label:''} shows out of stock at ${branchLabel()}.` : `Heads up: stock shows only ${left} left for ${p.name}${v.label?' '+v.label:''}.`);
   renderProducts(); renderCart();
 }
 function cartTotals(){
@@ -561,7 +617,7 @@ function renderCart(){
   fab.innerHTML = `<span>View order · ${t.count} item${t.count===1?'':'s'}</span><span class="amt num">${peso(t.total)}</span>`;
   const quickCash = [...new Set([t.total, Math.ceil(t.total/100)*100, Math.ceil(t.total/500)*500, 1000])].filter(x => x >= t.total && x > 0).slice(0,4);
   el.innerHTML = `
-    <div class="cart-h"><h2>Current order</h2><span class="spacer"></span>
+    <div class="cart-h"><div><h2>Current order</h2><div class="muted" style="font-size:13px">${esc(branchLabel())}</div></div><span class="spacer"></span>
       ${S.cart.length ? '<button class="btn ghost sm" data-act="clearcart">Clear</button>' : ''}
       <button class="btn sm cart-close" data-act="closecart">Close</button></div>
     <div class="cart-scroll">
@@ -601,6 +657,7 @@ async function charge(btn){
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const sale = await q(sb.rpc('create_sale', {
+      p_branch_id: curBranch(),
       p_items: S.cart.map(l => ({ variant_id:l.variant_id, qty:l.qty })),
       p_order_type: co.orderType, p_customer: co.customer, p_discount_type: co.discType, p_discount_ref: co.discRef,
       p_discount: Number(co.discAmt)||0, p_payment_method: co.method, p_payment_ref: co.payRef,
@@ -615,7 +672,7 @@ async function charge(btn){
 function receiptHTML(s, lines){
   const discLbl = s.discount_type==='senior_pwd' ? `Senior/PWD 20% (ID ${esc(s.discount_ref||'')})` : 'Promo discount';
   return `<div class="receipt">
-    <div class="c"><div class="t">${STORE.name}</div><div>${STORE.tagline}</div><div>${STORE.phone}</div></div><hr>
+    <div class="c"><div class="t">${STORE.name}</div><div>${STORE.tagline}</div><div>${esc(branchName(s.branch_id))}</div>${branchById(s.branch_id)?.address?`<div>${esc(branchById(s.branch_id).address)}</div>`:''}<div>${STORE.phone}</div></div><hr>
     <div class="l"><span>${esc(s.sale_no)}</span><span>${esc(s.order_type)}</span></div>
     <div>${fmtDT(s.created_at)}</div><div>Cashier: ${esc(nameOf(s.cashier_id))}</div>
     ${s.customer ? `<div>Customer: ${esc(s.customer)}</div>` : ''}<hr>
@@ -641,7 +698,7 @@ function showReceipt(sale, lines, fresh){
 async function viewSales(){
   S.salesDate = S.salesDate || manilaDate();
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>${viewLabel('sales')}</h1><div class="sub">${isAdmin() ? 'Every transaction, by day. Open one to reprint or void it.' : 'Your transactions for the day. Open one to reprint the receipt.'}</div></div></div>
+    <div class="page-head"><div><h1>${viewLabel('sales')}</h1><div class="sub">${isAdmin() ? `${esc(branchLabel())} · every transaction, by day. Open one to reprint or void it.` : 'Your transactions for the day. Open one to reprint the receipt.'}</div></div></div>
     <div class="row">
       <button class="btn sm" data-act="sday" data-d="-1" aria-label="Previous day">‹</button>
       <input class="input" id="sl_date" type="date" style="max-width:170px" value="${S.salesDate}">
@@ -661,6 +718,7 @@ async function loadSales(){
   try {
     let qy = sb.from('sales').select('*, sale_items(*)').gte('created_at', dayStart(S.salesDate).toISOString()).lt('created_at', dayStart(addDays(S.salesDate,1)).toISOString()).order('created_at', { ascending:false });
     if (S.salesCashier) qy = qy.eq('cashier_id', S.salesCashier);
+    if (isAdmin() && curBranch()) qy = qy.eq('branch_id', curBranch());
     S.sales = await q(qy); renderSales();
   } catch(e){ document.getElementById('salesList').innerHTML = `<div class="empty">Could not load sales: ${esc(errMsg(e))}</div>`; }
 }
@@ -678,11 +736,11 @@ function renderSales(){
   const list = document.getElementById('salesList');
   if (!rows.length){ list.innerHTML = `<div class="empty">${S.sales.length ? 'No sale matches that search.' : 'No sales on this day yet.'}</div>`; return; }
   const items = s => s.sale_items.reduce((a,i) => a + i.qty, 0);
-  list.innerHTML = `<div class="tbl-wrap resp"><table><thead><tr><th>Sale no.</th><th>Time</th><th>Cashier</th><th>Type</th><th class="r">Items</th><th>Payment</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>
-    ${rows.map(s => `<tr class="click ${s.status==='void'?'void-row':''}" data-act="opensale" data-id="${s.id}"><td class="num"><b>${esc(s.sale_no)}</b>${s.customer?`<div class="muted" style="font-size:13px">${esc(s.customer)}</div>`:''}</td><td class="num">${fmtTime(s.created_at)}</td><td>${esc(nameOf(s.cashier_id))}</td><td>${esc(s.order_type)}</td><td class="r num">${items(s)}</td><td>${esc(s.payment_method)}</td><td class="r num"><b>${peso(s.total)}</b></td><td class="keep">${s.status==='void'?'<span class="pill bad">Void</span>':'<span class="pill good">Paid</span>'}</td></tr>`).join('')}
+  list.innerHTML = `<div class="tbl-wrap resp"><table><thead><tr><th>Sale no.</th><th>Time</th>${curBranch()?'':'<th>Branch</th>'}<th>Cashier</th><th>Type</th><th class="r">Items</th><th>Payment</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(s => `<tr class="click ${s.status==='void'?'void-row':''}" data-act="opensale" data-id="${s.id}"><td class="num"><b>${esc(s.sale_no)}</b>${s.customer?`<div class="muted" style="font-size:13px">${esc(s.customer)}</div>`:''}</td><td class="num">${fmtTime(s.created_at)}</td>${curBranch()?'':`<td>${esc(branchName(s.branch_id))}</td>`}<td>${esc(nameOf(s.cashier_id))}</td><td>${esc(s.order_type)}</td><td class="r num">${items(s)}</td><td>${esc(s.payment_method)}</td><td class="r num"><b>${peso(s.total)}</b></td><td class="keep">${s.status==='void'?'<span class="pill bad">Void</span>':'<span class="pill good">Paid</span>'}</td></tr>`).join('')}
   </tbody></table></div>
   <div class="list-m">${rows.map(s => `<button class="li" data-act="opensale" data-id="${s.id}"><span class="a num">${esc(s.sale_no)}</span><span class="c num" style="${s.status==='void'?'text-decoration:line-through;color:var(--muted)':''}">${peso(s.total)}</span>
-    <span class="b">${fmtTime(s.created_at)} · ${esc(nameOf(s.cashier_id))} · ${items(s)} item${items(s)===1?'':'s'}</span><span class="b" style="text-align:right">${s.status==='void'?'<span class="pill bad">Void</span>':esc(s.payment_method)}</span></button>`).join('')}</div>`;
+    <span class="b">${fmtTime(s.created_at)} · ${curBranch()?'':esc(branchName(s.branch_id))+' · '}${esc(nameOf(s.cashier_id))} · ${items(s)} item${items(s)===1?'':'s'}</span><span class="b" style="text-align:right">${s.status==='void'?'<span class="pill bad">Void</span>':esc(s.payment_method)}</span></button>`).join('')}</div>`;
 }
 function openSale(id){
   const s = S.sales.find(x => x.id == id) || (S.repData?.sales || []).find(x => x.id == id); if (!s) return;
@@ -709,44 +767,58 @@ async function doVoid(id, btn){
 /* ===================== INVENTORY ===================== */
 async function viewInventory(){
   await refreshStock().catch(()=>{});
-  const low = S.items.filter(i => i.active && stockStatus(i)[0]==='Low').length;
-  const out = S.items.filter(i => i.active && stockStatus(i)[0]==='Out').length;
+  const b = curBranch();
+  const rows = b ? S.items.filter(i => i.active).map(i => stockOf(i.id, b)) : [];
+  const low = rows.filter(r => stockStatus(r)[0]==='Low').length, out = rows.filter(r => stockStatus(r)[0]==='Out').length;
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>${viewLabel('inventory')}</h1><div class="sub">Stock goes down automatically with each sale, using the recipe set on each menu item.</div></div>
+    <div class="page-head"><div><h1>${viewLabel('inventory')}</h1><div class="sub">${esc(branchLabel())} · stock goes down automatically with each sale, using the recipe set on each menu item.</div></div>
       <span class="spacer"></span>${isAdmin() ? '<button class="btn primary" data-act="newitem">Add stock item</button>' : ''}</div>
-    <div class="row">${out ? `<span class="pill bad">${out} out of stock</span>` : ''}${low ? `<span class="pill warn">${low} running low</span>` : ''}${!out && !low ? '<span class="pill good">All items above reorder level</span>' : ''}
+    <div class="row">${b ? `${out ? `<span class="pill bad">${out} out of stock</span>` : ''}${low ? `<span class="pill warn">${low} running low</span>` : ''}${!out && !low ? '<span class="pill good">All items above reorder level</span>' : ''}`
+        : '<span class="muted">Comparing every branch. Pick one branch at the top to update its stock.</span>'}
       <span class="spacer"></span><div class="seg" style="min-width:220px"><button data-act="invtab" data-v="stock" class="${S.invTab==='stock'?'on':''}">Stock on hand</button><button data-act="invtab" data-v="log" class="${S.invTab==='log'?'on':''}">Movement log</button></div></div>
     <div class="card" id="invBody"></div>
   </div>`;
-  S.invTab === 'log' ? renderMoveLog() : renderStock();
+  S.invTab === 'log' ? renderMoveLog() : (b ? renderStock() : renderMatrix());
 }
 function renderStock(){
-  const rows = S.items.filter(i => i.active || isAdmin());
+  const b = curBranch();
+  const items = S.items.filter(i => i.active || isAdmin());
   const usedBy = id => S.recipes.filter(r => r.item_id === id).length;
-  document.getElementById('invBody').innerHTML = !rows.length ? '<div class="empty">No stock items yet. Add your first item to start tracking.</div>' :
+  document.getElementById('invBody').innerHTML = !items.length ? '<div class="empty">No stock items yet. Add your first item to start tracking.</div>' :
   `<div class="tbl-wrap resp"><table><thead><tr><th>Item</th><th class="r">On hand</th><th class="r">Reorder at</th><th>Status</th>${isAdmin()?'<th class="r">Unit cost</th><th class="r">Value</th><th></th>':''}</tr></thead><tbody>
-  ${rows.map(i => { const [st,cl] = stockStatus(i); return `<tr><td><div class="namecell">${thumb(i.image_url)}<div><b>${esc(i.name)}</b><div class="muted" style="font-size:12px">${usedBy(i.id)} menu option${usedBy(i.id)===1?'':'s'} use this${i.active?'':' · hidden'}</div></div></div></td>
-    <td class="r num"><b>${qtyFmt(i.qty)}</b> <span class="muted">${esc(i.unit)}</span></td><td class="r num">${qtyFmt(i.reorder_level)}</td><td><span class="pill ${cl}">${st}</span></td>
-    ${isAdmin()?`<td class="r num">${peso(i.unit_cost)}</td><td class="r num">${peso(Math.max(0,i.qty)*i.unit_cost)}</td><td class="r" style="white-space:nowrap"><button class="btn sm primary" data-act="stock" data-id="${i.id}">Update stock</button> <button class="btn sm ghost" data-act="edititem" data-id="${i.id}">Edit</button></td>`:''}</tr>`; }).join('')}
+  ${items.map(i => { const r = stockOf(i.id, b); const [st,cl] = stockStatus(r); return `<tr><td><div class="namecell">${thumb(i.image_url)}<div><b>${esc(i.name)}</b><div class="muted" style="font-size:12px">${usedBy(i.id)} menu option${usedBy(i.id)===1?'':'s'} use this${i.active?'':' · hidden'}</div></div></div></td>
+    <td class="r num"><b>${qtyFmt(r.qty)}</b> <span class="muted">${esc(i.unit)}</span></td><td class="r num">${qtyFmt(r.reorder_level)}</td><td><span class="pill ${cl}">${st}</span></td>
+    ${isAdmin()?`<td class="r num">${peso(i.unit_cost)}</td><td class="r num">${peso(Math.max(0,r.qty)*i.unit_cost)}</td><td class="r" style="white-space:nowrap"><button class="btn sm primary" data-act="stock" data-id="${i.id}">Update stock</button> <button class="btn sm ghost" data-act="edititem" data-id="${i.id}">Edit</button></td>`:''}</tr>`; }).join('')}
   </tbody></table></div>
-  <div class="list-m">${rows.map(i => { const [st,cl] = stockStatus(i); return `<button class="li" ${isAdmin()?`data-act="stock" data-id="${i.id}"`:''}><span class="a namecell">${thumb(i.image_url)}${esc(i.name)}</span><span class="c num">${qtyFmt(i.qty)} <span class="muted" style="font-weight:500">${esc(i.unit)}</span></span>
-    <span class="b">Reorder at ${qtyFmt(i.reorder_level)}${isAdmin()?' · tap to update':''}</span><span class="b" style="text-align:right"><span class="pill ${cl}">${st}</span></span></button>`; }).join('')}</div>`;
+  <div class="list-m">${items.map(i => { const r = stockOf(i.id, b); const [st,cl] = stockStatus(r); return `<button class="li" ${isAdmin()?`data-act="stock" data-id="${i.id}"`:''}><span class="a namecell">${thumb(i.image_url)}${esc(i.name)}</span><span class="c num">${qtyFmt(r.qty)} <span class="muted" style="font-weight:500">${esc(i.unit)}</span></span>
+    <span class="b">Reorder at ${qtyFmt(r.reorder_level)}${isAdmin()?' · tap to update':''}</span><span class="b" style="text-align:right"><span class="pill ${cl}">${st}</span></span></button>`; }).join('')}</div>`;
+}
+function renderMatrix(){
+  const brs = activeBranches(); const items = S.items.filter(i => i.active);
+  document.getElementById('invBody').innerHTML = !brs.length || !items.length ? '<div class="empty">Add branches and stock items to compare stock.</div>' :
+  `<div class="tbl-wrap"><table class="matrix"><thead><tr><th>Item</th>${brs.map(b => `<th class="r">${esc(b.name)}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>
+  ${items.map(i => { let tot = 0; return `<tr><td><div class="namecell">${thumb(i.image_url)}<b>${esc(i.name)}</b></div></td>${brs.map(b => { const r = stockOf(i.id, b.id); tot += Number(r.qty); const [st,cl] = stockStatus(r);
+      return `<td class="q num"><b>${qtyFmt(r.qty)}</b> ${st!=='OK'?`<span class="pill ${cl}">${st}</span>`:''}</td>`; }).join('')}<td class="q num muted">${qtyFmt(tot)} ${esc(i.unit)}</td></tr>`; }).join('')}
+  </tbody></table></div>`;
 }
 async function renderMoveLog(){
   const box = document.getElementById('invBody'); box.innerHTML = '<div class="empty">Loading movements…</div>';
   try {
-    const mv = await q(sb.from('stock_movements').select('*, inventory_items(name,unit), sales(sale_no)').order('created_at',{ascending:false}).limit(150));
+    let qy = sb.from('stock_movements').select('*, inventory_items(name,unit), sales(sale_no)').order('created_at',{ascending:false}).limit(150);
+    if (curBranch()) qy = qy.eq('branch_id', curBranch());
+    const mv = await q(qy);
     const lbl = { sale:['Sale','mute'], void:['Void return','warn'], restock:['Stock in','good'], adjust:['Count adjust','mute'], waste:['Waste','bad'] };
-    box.innerHTML = !mv.length ? '<div class="empty">No stock movements yet.</div>' : `<div class="tbl-wrap"><table><thead><tr><th>When</th><th>Item</th><th>Type</th><th class="r">Change</th><th class="r">After</th><th>By / Note</th></tr></thead><tbody>
-      ${mv.map(m => `<tr><td class="num" style="white-space:nowrap">${fmtDT(m.created_at)}</td><td>${esc(m.inventory_items?.name)}</td><td><span class="pill ${lbl[m.type][1]}">${lbl[m.type][0]}</span></td>
+    box.innerHTML = !mv.length ? '<div class="empty">No stock movements yet.</div>' : `<div class="tbl-wrap"><table><thead><tr><th>When</th>${curBranch()?'':'<th>Branch</th>'}<th>Item</th><th>Type</th><th class="r">Change</th><th class="r">After</th><th>By / Note</th></tr></thead><tbody>
+      ${mv.map(m => `<tr><td class="num" style="white-space:nowrap">${fmtDT(m.created_at)}</td>${curBranch()?'':`<td>${esc(branchName(m.branch_id))}</td>`}<td>${esc(m.inventory_items?.name)}</td><td><span class="pill ${lbl[m.type][1]}">${lbl[m.type][0]}</span></td>
       <td class="r num" style="color:${m.change<0?'var(--chili)':'var(--good)'}"><b>${m.change>0?'+':''}${qtyFmt(m.change)}</b></td><td class="r num">${qtyFmt(m.qty_after)}</td>
       <td style="font-size:13px">${esc(nameOf(m.created_by))}${m.sales?.sale_no?` · ${esc(m.sales.sale_no)}`:''}${m.note?` · ${esc(m.note)}`:''}</td></tr>`).join('')}</tbody></table></div>`;
   } catch(e){ box.innerHTML = `<div class="empty">Could not load movements: ${esc(errMsg(e))}</div>`; }
 }
 function stockModal(id){
-  const it = itemById(Number(id));
-  openModal(`<div class="modal-h"><h2>${esc(it.name)}</h2><span class="pill ${stockStatus(it)[1]} num">${qtyFmt(it.qty)} ${esc(it.unit)}</span></div>
+  const it = itemById(Number(id)); const b = curBranch(); const r = stockOf(it.id, b);
+  openModal(`<div class="modal-h"><h2>${esc(it.name)}</h2><span class="pill ${stockStatus(r)[1]} num">${qtyFmt(r.qty)} ${esc(it.unit)}</span></div>
     <div class="modal-b">
+      <div class="muted" style="font-size:14px">Branch: <b style="color:var(--ink)">${esc(branchName(b))}</b></div>
       <div class="seg" id="st_type"><button class="on" data-act="sttype" data-v="restock">Stock in</button><button data-act="sttype" data-v="waste">Waste / spoiled</button><button data-act="sttype" data-v="adjust">Physical count</button></div>
       <div class="field"><label for="st_qty" id="st_lbl">Quantity added (${esc(it.unit)})</label><input class="input num" id="st_qty" type="number" inputmode="decimal" min="0" step="any" autofocus></div>
       <div class="field"><label for="st_note">Note (optional)</label><input class="input" id="st_note" placeholder="e.g. Morning batch, supplier delivery"></div>
@@ -754,48 +826,52 @@ function stockModal(id){
     </div>
     <div class="modal-f"><button class="btn ghost" data-act="edititem" data-id="${it.id}" style="margin-right:auto">Edit item &amp; photo</button><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savestock" data-id="${it.id}">Save</button></div>`);
   const m = document.querySelector('.overlay'); m.dataset.st = 'restock';
-  const prev = () => { const v = Number(document.getElementById('st_qty').value); const t = m.dataset.st; const cur = Number(it.qty);
+  const prev = () => { const v = Number(document.getElementById('st_qty').value); const t = m.dataset.st; const cur = Number(r.qty);
     const after = t==='restock' ? cur+v : t==='waste' ? cur-v : v;
     document.getElementById('st_prev').textContent = document.getElementById('st_qty').value === '' ? '' : `New on-hand: ${qtyFmt(after)} ${it.unit}`; };
   document.getElementById('st_qty').oninput = prev;
   m.prevStock = prev;
 }
 async function saveStock(id, btn){
-  const it = itemById(Number(id)); const t = document.querySelector('.overlay').dataset.st;
+  const it = itemById(Number(id)); const b = curBranch(); const t = document.querySelector('.overlay').dataset.st;
   const raw = document.getElementById('st_qty').value; const v = Number(raw);
   if (raw === '' || v < 0 || (t !== 'adjust' && v === 0)) return toast('Enter a quantity.', true);
-  const change = t==='restock' ? v : t==='waste' ? -v : round2(v - Number(it.qty));
+  const change = t==='restock' ? v : t==='waste' ? -v : round2(v - Number(stockOf(it.id, b).qty));
   if (change === 0) return toast('The count matches what is on hand. Nothing to change.');
   btn.disabled = true;
-  try { await q(sb.rpc('adjust_stock', { p_item_id:it.id, p_change:change, p_type:t, p_note:document.getElementById('st_note').value }));
+  try { await q(sb.rpc('adjust_stock', { p_branch_id:b, p_item_id:it.id, p_change:change, p_type:t, p_note:document.getElementById('st_note').value }));
     closeModal(); toast('Stock updated.'); await refreshStock(); renderStock();
   } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
 }
 function itemModal(id){
-  const it = id ? itemById(Number(id)) : { name:'', unit:'pc', reorder_level:0, unit_cost:0, active:true };
+  const it = id ? itemById(Number(id)) : { name:'', unit:'pc', default_reorder_level:0, unit_cost:0, active:true };
+  const b = curBranch(); const reorder = id && b ? stockOf(it.id, b).reorder_level : it.default_reorder_level;
   openModal(`<div class="modal-h"><h2>${id?'Edit stock item':'Add stock item'}</h2></div>
     <div class="modal-b">
       ${photoPicker(it.image_url)}
       <div class="field"><label for="it_name">Name</label><input class="input" id="it_name" value="${esc(it.name)}" placeholder="e.g. Chicken Biryani"></div>
       <div class="grid2"><div class="field"><label for="it_unit">Unit</label><input class="input" id="it_unit" value="${esc(it.unit)}" placeholder="pc, serving, kg, set"></div>
-        <div class="field"><label for="it_reorder">Reorder when at or below</label><input class="input num" id="it_reorder" type="number" min="0" step="any" value="${it.reorder_level}"></div></div>
+        <div class="field"><label for="it_reorder">${id && b ? `Reorder level at ${esc(branchName(b))}` : 'Reorder level (all branches)'}</label><input class="input num" id="it_reorder" type="number" min="0" step="any" value="${reorder}"></div></div>
       <div class="grid2"><div class="field"><label for="it_cost">Cost per unit (₱)</label><input class="input num" id="it_cost" type="number" min="0" step="any" value="${it.unit_cost}"></div>
         ${id ? `<label class="row" style="align-self:end;min-height:40px"><input type="checkbox" id="it_active" ${it.active?'checked':''}> Active</label>` : ''}</div>
-      ${id ? '' : '<div class="muted" style="font-size:13px">New items start at 0. Use Update stock to record the first delivery or batch.</div>'}
+      <div class="muted" style="font-size:13px">${id ? 'Name, unit, cost and photo apply to every branch.' : 'The item is added to every branch at 0. Use Update stock to record the first delivery or batch.'}</div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveitem" data-id="${id||''}">Save</button></div>`);
   bindPhotoPicker();
 }
 async function saveItem(id, btn){
-  const row = { name:document.getElementById('it_name').value.trim(), unit:document.getElementById('it_unit').value.trim()||'pc',
-    reorder_level:Number(document.getElementById('it_reorder').value)||0, unit_cost:Number(document.getElementById('it_cost').value)||0 };
+  const b = curBranch(); const reorder = Number(document.getElementById('it_reorder').value)||0;
+  const row = { name:document.getElementById('it_name').value.trim(), unit:document.getElementById('it_unit').value.trim()||'pc', unit_cost:Number(document.getElementById('it_cost').value)||0 };
   if (!row.name) return toast('Enter a name.', true);
   if (id) row.active = document.getElementById('it_active').checked;
+  if (!id || !b) row.default_reorder_level = reorder;
   btn.disabled = true;
   try { let iid = id ? Number(id) : null;
     if (iid) await q(sb.from('inventory_items').update(row).eq('id', iid)); else iid = (await q(sb.from('inventory_items').insert(row).select().single())).id;
+    if (id && b) await q(sb.from('branch_stock').update({ reorder_level:reorder }).eq('branch_id', b).eq('item_id', iid));
+    else if (id && !b) await q(sb.from('branch_stock').update({ reorder_level:reorder }).eq('item_id', iid));
     await applyPhoto('inventory_items', 'stock', iid);
-    closeModal(); toast('Saved.'); await refreshStock(); renderStock();
+    closeModal(); toast('Saved.'); await refreshStock(); viewInventory();
   } catch(e){ btn.disabled = false; toast(/duplicate/i.test(errMsg(e)) ? 'An item with that name already exists.' : errMsg(e), true); }
 }
 
@@ -890,7 +966,7 @@ function rangeDates(){
 function viewReports(){
   const r = S.rep; const [f,t] = rangeDates();
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>Reports</h1><div class="sub" id="rp_sub">${f===t ? fmtDay(f) : fmtDay(f)+' – '+fmtDay(t)}</div></div><span class="spacer"></span>
+    <div class="page-head"><div><h1>Reports</h1><div class="sub" id="rp_sub">${esc(branchLabel())} · ${f===t ? fmtDay(f) : fmtDay(f)+' – '+fmtDay(t)}</div></div><span class="spacer"></span>
       <button class="btn" data-act="csv">Export CSV</button></div>
     <div class="rangebar">${[['today','Today'],['yesterday','Yesterday'],['7d','Last 7 days'],['month','This month'],['custom','Custom']].map(([k,l]) => `<button class="chip ${r.range===k?'on':''}" data-act="range" data-v="${k}">${l}</button>`).join('')}
       ${r.range==='custom' ? `<input class="input" type="date" id="rp_from" value="${f}" style="max-width:160px"><span class="muted">to</span><input class="input" type="date" id="rp_to" value="${t}" style="max-width:160px">` : ''}</div>
@@ -903,7 +979,9 @@ function viewReports(){
 async function loadReport(){
   let [f,t] = rangeDates(); if (f > t) [f,t] = [t,f];
   try {
-    const sales = await q(sb.from('sales').select('*, sale_items(*)').gte('created_at', dayStart(f).toISOString()).lt('created_at', dayStart(addDays(t,1)).toISOString()).order('created_at').limit(5000));
+    let qy = sb.from('sales').select('*, sale_items(*)').gte('created_at', dayStart(f).toISOString()).lt('created_at', dayStart(addDays(t,1)).toISOString()).order('created_at').limit(5000);
+    if (curBranch()) qy = qy.eq('branch_id', curBranch());
+    const sales = await q(qy);
     S.repData = { f, t, sales }; await refreshStock(); renderReport();
   } catch(e){ document.getElementById('rp').innerHTML = `<div class="empty">Could not load the report: ${esc(errMsg(e))}</div>`; }
 }
@@ -946,7 +1024,8 @@ function renderReport(){
   const items = new Map(); lines.forEach(l => { const k = l.product_name + (l.variant_label ? ' · ' + l.variant_label : ''); const o = items.get(k) || { q:0, r:0, c:l.category }; o.q += l.qty; o.r += Number(l.line_total); items.set(k, o); });
   const top = [...items.entries()].sort((a,b) => b[1].r - a[1].r);
   const cashiers = new Map(); ok.forEach(s => { const o = cashiers.get(s.cashier_id) || { n:0, v:0 }; o.n++; o.v += Number(s.total); cashiers.set(s.cashier_id, o); });
-  const low = S.items.filter(i => i.active && stockStatus(i)[0] !== 'OK');
+  const low = []; (curBranch() ? [curBranch()] : activeBranches().map(b => b.id)).forEach(bid => S.items.filter(i => i.active).forEach(i => { const r = stockOf(i.id, bid); if (stockStatus(r)[0] !== 'OK') low.push({ i, r, bid }); }));
+  const byBranch = sumBy(ok, s => branchName(s.branch_id), s => Number(s.total));
   const senior = ok.filter(s => s.discount_type==='senior_pwd');
   document.getElementById('rp').innerHTML = `
     <div class="kpis">
@@ -958,7 +1037,7 @@ function renderReport(){
     </div>
     <div class="two">
       <div class="card"><div class="card-h"><h3>${chartTitle}</h3><span class="spacer"></span><span class="muted" style="font-size:13px">Highest in saffron</span></div><div class="card-b">${ok.length ? chart : '<div class="empty">No sales in this period yet.</div>'}</div></div>
-      <div class="card"><div class="card-h"><h3>Payment methods</h3></div><div class="card-b">${barList(sumBy(ok, s=>s.payment_method, s=>Number(s.total)))}
+      <div class="card"><div class="card-h"><h3>${curBranch() ? 'Payment methods' : 'Sales by branch'}</h3></div><div class="card-b">${curBranch() ? '' : barList(byBranch, {ink:true}) + '<div class="lbl" style="margin:16px 0 8px">Payment methods</div>'}${barList(sumBy(ok, s=>s.payment_method, s=>Number(s.total)))}
         <div class="lbl" style="margin:16px 0 8px">Order type</div>${barList(sumBy(ok, s=>s.order_type, s=>Number(s.total)), {ink:true})}
         <div class="lbl" style="margin:16px 0 8px">Category</div>${barList(sumBy(lines, l=>l.category, l=>Number(l.line_total)))}</div></div>
     </div>
@@ -970,48 +1049,51 @@ function renderReport(){
         <div class="card"><div class="card-h"><h3>Sales officers</h3></div>
           ${cashiers.size ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th class="r">Orders</th><th class="r">Sales</th></tr></thead><tbody>${[...cashiers.entries()].sort((a,b)=>b[1].v-a[1].v).map(([id,o]) => `<tr><td>${esc(nameOf(id))}</td><td class="r num">${o.n}</td><td class="r num">${peso(o.v)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No sales yet.</div>'}</div>
         <div class="card"><div class="card-h"><h3>Stock to reorder</h3><span class="spacer"></span><a class="btn sm ghost" href="#inventory">Open inventory</a></div>
-          ${low.length ? `<div class="tbl-wrap"><table><tbody>${low.map(i => `<tr><td>${esc(i.name)}</td><td class="r num">${qtyFmt(i.qty)} ${esc(i.unit)}</td><td class="r"><span class="pill ${stockStatus(i)[1]}">${stockStatus(i)[0]}</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="card-b muted">Everything is above its reorder level.</div>'}</div>
+          ${low.length ? `<div class="tbl-wrap"><table><tbody>${low.map(({i,r,bid}) => `<tr><td>${esc(i.name)}${curBranch()?'':`<div class="muted" style="font-size:12px">${esc(branchName(bid))}</div>`}</td><td class="r num">${qtyFmt(r.qty)} ${esc(i.unit)}</td><td class="r"><span class="pill ${stockStatus(r)[1]}">${stockStatus(r)[0]}</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="card-b muted">Everything is above its reorder level.</div>'}</div>
       </div>
     </div>`;
 }
 function exportCSV(){
   if (!S.repData) return;
-  const rows = [['Sale No','Date','Time','Cashier','Order Type','Customer','Item','Option','Qty','Unit Price','Line Total','Sale Subtotal','Discount Type','Discount','Sale Total','Payment','Status']];
-  S.repData.sales.forEach(s => s.sale_items.forEach(l => rows.push([s.sale_no, manilaDate(new Date(s.created_at)), fmtTime(s.created_at), nameOf(s.cashier_id), s.order_type, s.customer||'', l.product_name, l.variant_label, l.qty, l.unit_price, l.line_total, s.subtotal, s.discount_type, s.discount, s.total, s.payment_method, s.status])));
+  const rows = [['Sale No','Branch','Date','Time','Cashier','Order Type','Customer','Item','Option','Qty','Unit Price','Line Total','Sale Subtotal','Discount Type','Discount','Sale Total','Payment','Status']];
+  S.repData.sales.forEach(s => s.sale_items.forEach(l => rows.push([s.sale_no, branchName(s.branch_id), manilaDate(new Date(s.created_at)), fmtTime(s.created_at), nameOf(s.cashier_id), s.order_type, s.customer||'', l.product_name, l.variant_label, l.qty, l.unit_price, l.line_total, s.subtotal, s.discount_type, s.discount, s.total, s.payment_method, s.status])));
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+csv], { type:'text/csv' }));
-  a.download = `indiana-spice-sales_${S.repData.f}_to_${S.repData.t}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  a.download = `indiana-spice-sales_${curBranch() ? branchById(curBranch()).code.toLowerCase() : 'all'}_${S.repData.f}_to_${S.repData.t}.csv`; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ===================== STAFF (admin) ===================== */
 async function viewStaff(){
   S.profiles = await q(sb.from('profiles').select('*').order('full_name')).catch(() => S.profiles);
+  const brOpts = sel => activeBranches().map(b => `<option value="${b.id}" ${sel===b.id?'selected':''}>${esc(b.name)}</option>`).join('');
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>Staff accounts</h1><div class="sub">Sales Officers can sell, view their own sales and check stock. Admins see everything.</div></div>
+    <div class="page-head"><div><h1>Staff accounts</h1><div class="sub">Sales Officers sell and see stock for their own branch only. Admins see every branch.</div></div>
       <span class="spacer"></span><button class="btn primary" data-act="newstaff">Add staff</button></div>
-    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Status</th><th></th></tr></thead><tbody>
     ${S.profiles.map(p => { const self = p.id === S.me.id; return `<tr><td><b>${esc(p.full_name)}</b>${self?' <span class="muted">(you)</span>':''}</td><td class="num">@${esc(p.username)}</td>
-      <td>${self ? '<span class="pill mute">Admin</span>' : `<select class="input" data-act-change="role" data-id="${p.id}" style="max-width:160px;min-height:34px;padding:4px 8px"><option value="sales" ${p.role==='sales'?'selected':''}>Sales Officer</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select>`}</td>
+      <td>${self ? '<span class="pill mute">Admin</span>' : `<select class="input" data-change="role" data-id="${p.id}" style="max-width:160px;min-height:34px;padding:4px 8px"><option value="sales" ${p.role==='sales'?'selected':''}>Sales Officer</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select>`}</td>
+      <td>${p.role==='admin' ? '<span class="muted">All branches</span>' : `<select class="input" data-change="staffbranch" data-id="${p.id}" style="max-width:180px;min-height:34px;padding:4px 8px">${p.branch_id?'':'<option value="">Choose…</option>'}${brOpts(p.branch_id)}</select>`}</td>
       <td>${p.active?'<span class="pill good">Active</span>':'<span class="pill bad">Deactivated</span>'}</td>
       <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="resetpw" data-id="${p.id}">Reset password</button>${self?'':` <button class="btn sm ${p.active?'danger':''}" data-act="toggleactive" data-id="${p.id}">${p.active?'Deactivate':'Activate'}</button>`}</td></tr>`; }).join('')}
     </tbody></table></div></div>
     <div class="muted" style="font-size:13px">Staff sign in with their username and password on any phone, tablet or computer.</div>
   </div>`;
-  main().querySelectorAll('[data-act-change="role"]').forEach(s => s.onchange = async e => {
-    try { await q(sb.from('profiles').update({ role:e.target.value }).eq('id', e.target.dataset.id)); toast('Role updated.'); viewStaff(); } catch(err){ toast(errMsg(err), true); } });
 }
 function staffModal(){
+  if (!activeBranches().length) return toast('Add a branch first under Branches.', true);
   openModal(`<div class="modal-h"><h2>Add staff</h2></div><div class="modal-b">
     <div class="field"><label for="sf_name">Full name</label><input class="input" id="sf_name" placeholder="e.g. Maria Santos"></div>
     <div class="grid2"><div class="field"><label for="sf_user">Username</label><input class="input" id="sf_user" autocapitalize="none" placeholder="e.g. maria"></div>
       <div class="field"><label for="sf_role">Role</label><select class="input" id="sf_role"><option value="sales">Sales Officer</option><option value="admin">Admin</option></select></div></div>
+    <div class="field" id="sf_branch_f"><label for="sf_branch">Branch</label><select class="input" id="sf_branch">${activeBranches().map(b => `<option value="${b.id}" ${curBranch()===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>
     <div class="field"><label for="sf_pass">Starting password</label><input class="input" id="sf_pass" type="text" placeholder="At least 6 characters"></div>
     <div class="muted" style="font-size:13px">Share the username and password with them. You can reset it any time.</div>
   </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savestaff">Create account</button></div>`);
+  document.getElementById('sf_role').onchange = e => document.getElementById('sf_branch_f').hidden = e.target.value === 'admin';
 }
 async function saveStaff(btn){
   btn.disabled = true;
-  try { await callStaff({ action:'create', full_name:document.getElementById('sf_name').value, username:document.getElementById('sf_user').value, password:document.getElementById('sf_pass').value, role:document.getElementById('sf_role').value });
+  try { await callStaff({ action:'create', full_name:document.getElementById('sf_name').value, username:document.getElementById('sf_user').value, password:document.getElementById('sf_pass').value, role:document.getElementById('sf_role').value, branch_id:Number(document.getElementById('sf_branch').value) });
     closeModal(); toast('Staff account created.'); viewStaff();
   } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
 }
@@ -1022,11 +1104,49 @@ function resetPwModal(id){
     <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="dopw" data-id="${id}">Set password</button></div>`);
 }
 
+/* ===================== BRANCHES (admin) ===================== */
+function viewBranches(){
+  const today = manilaDate();
+  main().innerHTML = `<div class="page">
+    <div class="page-head"><div><h1>Branches</h1><div class="sub">Each branch keeps its own stock, sales and staff. The menu and prices are shared.</div></div>
+      <span class="spacer"></span><button class="btn primary" data-act="editbranch" data-id="">Add branch</button></div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Code</th><th>Address</th><th class="r">Staff</th><th>Status</th><th></th></tr></thead><tbody>
+    ${S.branches.map(b => `<tr><td><b>${esc(b.name)}</b></td><td class="num">${esc(b.code)}</td><td>${esc(b.address||'')}</td>
+      <td class="r num">${S.profiles.filter(p => p.branch_id===b.id && p.active && p.role==='sales').length}</td>
+      <td>${b.active?'<span class="pill good">Open</span>':'<span class="pill mute">Closed</span>'}</td>
+      <td class="r"><button class="btn sm" data-act="editbranch" data-id="${b.id}">Edit</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No branches yet.</td></tr>'}
+    </tbody></table></div></div>
+    <div class="muted" style="font-size:13px">The code starts every sale number from that branch, for example ${esc(S.branches[0]?.code || 'MAIN')}-${today.slice(2).replace(/-/g,'')}-001.</div>
+  </div>`;
+}
+function branchModal(id){
+  const b = id ? branchById(Number(id)) : { name:'', code:'', address:'', active:true };
+  openModal(`<div class="modal-h"><h2>${id?'Edit branch':'Add branch'}</h2></div><div class="modal-b">
+    <div class="field"><label for="br_name">Branch name</label><input class="input" id="br_name" value="${esc(b.name)}" placeholder="e.g. Vigan Branch"></div>
+    <div class="grid2"><div class="field"><label for="br_code">Code (2–5 letters/numbers)</label><input class="input" id="br_code" value="${esc(b.code)}" placeholder="e.g. VGN" maxlength="5" style="text-transform:uppercase"></div>
+      ${id ? `<label class="row" style="align-self:end;min-height:40px"><input type="checkbox" id="br_active" ${b.active?'checked':''}> Open (can sell)</label>` : '<span></span>'}</div>
+    <div class="field"><label for="br_addr">Address (shows on receipts)</label><input class="input" id="br_addr" value="${esc(b.address||'')}" placeholder="e.g. Plaza Burgos, Vigan City"></div>
+    ${id ? '' : '<div class="muted" style="font-size:13px">The new branch starts with every stock item at 0.</div>'}
+  </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savebranch" data-id="${id||''}">Save</button></div>`);
+}
+async function saveBranch(id, btn){
+  const row = { name:document.getElementById('br_name').value.trim(), code:document.getElementById('br_code').value.trim().toUpperCase(), address:document.getElementById('br_addr').value.trim() || null };
+  if (!row.name) return toast('Enter the branch name.', true);
+  if (!/^[A-Z0-9]{2,5}$/.test(row.code)) return toast('The code must be 2–5 letters or numbers, like VGN.', true);
+  if (id) row.active = document.getElementById('br_active').checked;
+  btn.disabled = true;
+  try { id ? await q(sb.from('branches').update(row).eq('id', id)) : await q(sb.from('branches').insert(row));
+    await loadCatalog(); closeModal(); toast(id ? 'Branch saved.' : 'Branch added.');
+    if (S.branchSel !== 'all' && !branchById(S.branchSel)?.active) S.branchSel = 'all';
+    renderShell(); route();
+  } catch(e){ btn.disabled = false; toast(/duplicate|unique/i.test(errMsg(e)) ? 'Another branch already uses that name or code.' : errMsg(e), true); }
+}
+
 /* ===================== MORE (mobile) ===================== */
 function viewMore(){
   main().innerHTML = `<div class="page">
-    <div class="card card-b" style="display:flex;flex-direction:column;gap:2px"><span class="lbl">${isAdmin()?'Admin':'Sales Officer'}</span><b style="font-size:18px">${esc(S.me.full_name)}</b><span class="muted">@${esc(S.me.username)}</span></div>
-    ${isAdmin() ? `<div class="card"><div class="list-m" style="display:flex">${['menu','staff'].map(v => `<a class="li" href="#${v}" style="text-decoration:none;color:inherit"><span class="a">${VIEWS[v].label}</span><span class="c">›</span><span class="b">${v==='menu'?'Prices, sizes and stock links':'Accounts for sales officers'}</span></a>`).join('')}</div></div>` : ''}
+    <div class="card card-b" style="display:flex;flex-direction:column;gap:2px"><span class="lbl">${isAdmin()?'Admin':'Sales Officer'}</span><b style="font-size:18px">${esc(S.me.full_name)}</b><span class="muted">@${esc(S.me.username)} · ${esc(isAdmin() ? branchLabel() : branchName(S.me.branch_id))}</span></div>
+    ${isAdmin() ? `<div class="card"><div class="list-m" style="display:flex">${['menu','staff','branches'].map(v => `<a class="li" href="#${v}" style="text-decoration:none;color:inherit"><span class="a">${VIEWS[v].label}</span><span class="c">›</span><span class="b">${{menu:'Prices, sizes and stock links',staff:'Accounts for sales officers',branches:'Add or edit branches'}[v]}</span></a>`).join('')}</div></div>` : ''}
     <button class="btn danger" data-act="signout">Sign out</button>
   </div>`;
 }
@@ -1092,6 +1212,9 @@ document.addEventListener('click', async e => {
     case 'addrec': syncDraft(); if (!S.items.length) return toast('Add a stock item first in Inventory.', true); S.draft.variants[el.dataset.vi].recipe.push({ item_id:S.items[0].id, qty:1 }); return renderVariants();
     case 'rmrec': { syncDraft(); const [vi,ri] = el.dataset.ri.split('.'); S.draft.variants[vi].recipe.splice(ri,1); return renderVariants(); }
     case 'saveprod': return saveProd(id, el);
+    case 'setbranch': return setBranch(el.dataset.v);
+    case 'editbranch': return branchModal(id || null);
+    case 'savebranch': return saveBranch(id, el);
     case 'rmphoto': S.photo.blob = null; S.photo.remove = true; document.getElementById('ph_prev').textContent = 'No photo'; el.hidden = true; document.getElementById('ph_file').value = ''; return;
     case 'range': S.rep.range = el.dataset.v; return viewReports();
     case 'csv': return exportCSV();
@@ -1104,6 +1227,17 @@ document.addEventListener('click', async e => {
   }
 });
 
+document.addEventListener('change', async e => {
+  const el = e.target.closest('[data-change]'); if (!el) return;
+  const k = el.dataset.change;
+  if (k === 'branch') return setBranch(el.value);
+  if (k === 'role' || k === 'staffbranch'){
+    const p = S.profiles.find(x => x.id === el.dataset.id);
+    const patch = k === 'role' ? { role:el.value } : { branch_id:Number(el.value) || null };
+    if (k === 'role' && el.value === 'sales' && !p.branch_id) patch.branch_id = curBranch() || activeBranches()[0]?.id || null;
+    try { await q(sb.from('profiles').update(patch).eq('id', p.id)); toast(k === 'role' ? 'Role updated.' : 'Branch updated.'); viewStaff(); } catch(err){ toast(errMsg(err), true); }
+  }
+});
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && S.me){ S.me = null; showAuth(); } });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 boot();
