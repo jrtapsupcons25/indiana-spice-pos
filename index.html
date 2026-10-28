@@ -148,6 +148,16 @@ main{min-width:0;overflow:auto;position:relative}
 .prod .pr{margin-top:auto;font-weight:700;font-size:16px}
 .prod .pr span{color:var(--muted);font-weight:500;font-size:13px}
 .prod .tag{align-self:flex-start}
+.prod.has-ph{padding-top:0;overflow:hidden}
+.prod .ph{display:block;margin:0 -12px 2px;width:calc(100% + 24px);max-width:none;aspect-ratio:4/3;object-fit:cover;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.thumb{width:40px;height:40px;border-radius:7px;object-fit:cover;flex:none;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+.thumb svg{width:18px;height:18px}
+.namecell{display:flex;align-items:center;gap:10px;min-width:0}
+.photo-pick{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.photo-pick .pv{width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center;overflow:hidden}
+.photo-pick .pv img{width:100%;height:100%;object-fit:cover}
+.photo-pick label.btn{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
+.photo-pick input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .prod .incart{position:absolute;bottom:10px;right:10px;background:var(--accent);color:var(--accent-ink);border-radius:99px;min-width:24px;height:24px;display:grid;place-items:center;font-weight:700;font-size:13px;padding:0 6px}
 .cart{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .cart-h{padding:16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
@@ -317,6 +327,48 @@ const hourOf = iso => Number(new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour:'
 const isAdmin = () => S.me?.role === 'admin';
 const nameOf = id => S.profiles.find(p => p.id === id)?.full_name || '—';
 const round2 = n => Math.round(n*100)/100;
+const PH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-8 7"/></svg>';
+const thumb = url => url ? `<img class="thumb" src="${esc(url)}" alt="" loading="lazy">` : `<span class="thumb">${PH_ICON}</span>`;
+/* photos: shrink on the phone before upload (max 900px JPEG) */
+async function shrinkImage(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error('That file is not a readable picture. Try a JPG or PNG.')); i.src = url; });
+    const k = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth*k); c.height = Math.round(img.naturalHeight*k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadPhoto(folder, id, blob){
+  const path = `${folder}/${id}-${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert:true });
+  if (error) throw error;
+  return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
+}
+function photoPicker(current){
+  S.photo = { blob:null, remove:false, current:current||null };
+  return `<div class="field"><span class="lbl">Photo</span><div class="photo-pick">
+    <div class="pv" id="ph_prev">${current ? `<img src="${esc(current)}" alt="">` : 'No photo'}</div>
+    <div class="row"><label class="btn sm" for="ph_file">${current ? 'Change photo' : 'Add photo'}</label>
+      <input type="file" id="ph_file" accept="image/*">
+      <button class="btn sm ghost" data-act="rmphoto" id="ph_rm" ${current?'':'hidden'}>Remove</button></div>
+    <div class="muted" style="font-size:12px;flex-basis:100%">On a phone you can take a picture or pick one from the gallery.</div></div></div>`;
+}
+function bindPhotoPicker(){
+  const inp = document.getElementById('ph_file'); if (!inp) return;
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    try { S.photo.blob = await shrinkImage(f); S.photo.remove = false;
+      document.getElementById('ph_prev').innerHTML = `<img src="${URL.createObjectURL(S.photo.blob)}" alt="">`;
+      document.getElementById('ph_rm').hidden = false;
+    } catch(e){ toast(errMsg(e), true); }
+  };
+}
+async function applyPhoto(table, folder, id){
+  if (S.photo?.blob){ const url = await uploadPhoto(folder, id, S.photo.blob); await q(sb.from(table).update({ image_url:url }).eq('id', id)); }
+  else if (S.photo?.remove && S.photo.current){ await q(sb.from(table).update({ image_url:null }).eq('id', id)); }
+}
 
 function toast(msg, bad=false){
   document.querySelectorAll('.toast').forEach(t=>t.remove());
@@ -479,7 +531,7 @@ function renderProducts(){
       const tag = min === null ? '' : min <= 0 ? '<span class="pill bad tag">Out of stock</span>' : min <= 5 ? `<span class="pill warn tag">${min} left</span>` : '';
       const inCart = S.cart.filter(l => vs.some(v => v.id === l.variant_id)).reduce((a,l) => a + l.qty, 0);
       const price = vs.length === 1 ? pesoShort(vs[0].price) : vs.map(v => `<span>${esc(v.label)}</span> ${pesoShort(v.price)}`).join('<span> · </span>');
-      return `<button class="prod" data-act="pick" data-pid="${p.id}"><span class="nm">${esc(p.name)}</span>${tag}<span class="pr num">${price}</span>${inCart?`<span class="incart num">${inCart}</span>`:''}</button>`;
+      return `<button class="prod ${p.image_url?'has-ph':''}" data-act="pick" data-pid="${p.id}">${p.image_url?`<img class="ph" src="${esc(p.image_url)}" alt="" loading="lazy">`:''}<span class="nm">${esc(p.name)}</span>${tag}<span class="pr num">${price}</span>${inCart?`<span class="incart num">${inCart}</span>`:''}</button>`;
     }).join('') + '</div>';
   }
   document.getElementById('prodList').innerHTML = html || '<div class="empty">No menu items match. Clear the search or pick another category.</div>';
@@ -673,11 +725,11 @@ function renderStock(){
   const usedBy = id => S.recipes.filter(r => r.item_id === id).length;
   document.getElementById('invBody').innerHTML = !rows.length ? '<div class="empty">No stock items yet. Add your first item to start tracking.</div>' :
   `<div class="tbl-wrap resp"><table><thead><tr><th>Item</th><th class="r">On hand</th><th class="r">Reorder at</th><th>Status</th>${isAdmin()?'<th class="r">Unit cost</th><th class="r">Value</th><th></th>':''}</tr></thead><tbody>
-  ${rows.map(i => { const [st,cl] = stockStatus(i); return `<tr><td><b>${esc(i.name)}</b><div class="muted" style="font-size:12px">${usedBy(i.id)} menu option${usedBy(i.id)===1?'':'s'} use this${i.active?'':' · hidden'}</div></td>
+  ${rows.map(i => { const [st,cl] = stockStatus(i); return `<tr><td><div class="namecell">${thumb(i.image_url)}<div><b>${esc(i.name)}</b><div class="muted" style="font-size:12px">${usedBy(i.id)} menu option${usedBy(i.id)===1?'':'s'} use this${i.active?'':' · hidden'}</div></div></div></td>
     <td class="r num"><b>${qtyFmt(i.qty)}</b> <span class="muted">${esc(i.unit)}</span></td><td class="r num">${qtyFmt(i.reorder_level)}</td><td><span class="pill ${cl}">${st}</span></td>
     ${isAdmin()?`<td class="r num">${peso(i.unit_cost)}</td><td class="r num">${peso(Math.max(0,i.qty)*i.unit_cost)}</td><td class="r" style="white-space:nowrap"><button class="btn sm primary" data-act="stock" data-id="${i.id}">Update stock</button> <button class="btn sm ghost" data-act="edititem" data-id="${i.id}">Edit</button></td>`:''}</tr>`; }).join('')}
   </tbody></table></div>
-  <div class="list-m">${rows.map(i => { const [st,cl] = stockStatus(i); return `<button class="li" ${isAdmin()?`data-act="stock" data-id="${i.id}"`:''}><span class="a">${esc(i.name)}</span><span class="c num">${qtyFmt(i.qty)} <span class="muted" style="font-weight:500">${esc(i.unit)}</span></span>
+  <div class="list-m">${rows.map(i => { const [st,cl] = stockStatus(i); return `<button class="li" ${isAdmin()?`data-act="stock" data-id="${i.id}"`:''}><span class="a namecell">${thumb(i.image_url)}${esc(i.name)}</span><span class="c num">${qtyFmt(i.qty)} <span class="muted" style="font-weight:500">${esc(i.unit)}</span></span>
     <span class="b">Reorder at ${qtyFmt(i.reorder_level)}${isAdmin()?' · tap to update':''}</span><span class="b" style="text-align:right"><span class="pill ${cl}">${st}</span></span></button>`; }).join('')}</div>`;
 }
 async function renderMoveLog(){
@@ -700,7 +752,7 @@ function stockModal(id){
       <div class="field"><label for="st_note">Note (optional)</label><input class="input" id="st_note" placeholder="e.g. Morning batch, supplier delivery"></div>
       <div class="muted num" id="st_prev" style="font-size:14px"></div>
     </div>
-    <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savestock" data-id="${it.id}">Save</button></div>`);
+    <div class="modal-f"><button class="btn ghost" data-act="edititem" data-id="${it.id}" style="margin-right:auto">Edit item &amp; photo</button><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savestock" data-id="${it.id}">Save</button></div>`);
   const m = document.querySelector('.overlay'); m.dataset.st = 'restock';
   const prev = () => { const v = Number(document.getElementById('st_qty').value); const t = m.dataset.st; const cur = Number(it.qty);
     const after = t==='restock' ? cur+v : t==='waste' ? cur-v : v;
@@ -723,6 +775,7 @@ function itemModal(id){
   const it = id ? itemById(Number(id)) : { name:'', unit:'pc', reorder_level:0, unit_cost:0, active:true };
   openModal(`<div class="modal-h"><h2>${id?'Edit stock item':'Add stock item'}</h2></div>
     <div class="modal-b">
+      ${photoPicker(it.image_url)}
       <div class="field"><label for="it_name">Name</label><input class="input" id="it_name" value="${esc(it.name)}" placeholder="e.g. Chicken Biryani"></div>
       <div class="grid2"><div class="field"><label for="it_unit">Unit</label><input class="input" id="it_unit" value="${esc(it.unit)}" placeholder="pc, serving, kg, set"></div>
         <div class="field"><label for="it_reorder">Reorder when at or below</label><input class="input num" id="it_reorder" type="number" min="0" step="any" value="${it.reorder_level}"></div></div>
@@ -731,6 +784,7 @@ function itemModal(id){
       ${id ? '' : '<div class="muted" style="font-size:13px">New items start at 0. Use Update stock to record the first delivery or batch.</div>'}
     </div>
     <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveitem" data-id="${id||''}">Save</button></div>`);
+  bindPhotoPicker();
 }
 async function saveItem(id, btn){
   const row = { name:document.getElementById('it_name').value.trim(), unit:document.getElementById('it_unit').value.trim()||'pc',
@@ -738,7 +792,9 @@ async function saveItem(id, btn){
   if (!row.name) return toast('Enter a name.', true);
   if (id) row.active = document.getElementById('it_active').checked;
   btn.disabled = true;
-  try { id ? await q(sb.from('inventory_items').update(row).eq('id', id)) : await q(sb.from('inventory_items').insert(row));
+  try { let iid = id ? Number(id) : null;
+    if (iid) await q(sb.from('inventory_items').update(row).eq('id', iid)); else iid = (await q(sb.from('inventory_items').insert(row).select().single())).id;
+    await applyPhoto('inventory_items', 'stock', iid);
     closeModal(); toast('Saved.'); await refreshStock(); renderStock();
   } catch(e){ btn.disabled = false; toast(/duplicate/i.test(errMsg(e)) ? 'An item with that name already exists.' : errMsg(e), true); }
 }
@@ -750,7 +806,7 @@ function viewMenu(){
       <span class="spacer"></span><button class="btn primary" data-act="editprod" data-id="">Add menu item</button></div>
     ${CATS.map(c => { const ps = S.products.filter(p => p.category===c); return `<div class="card"><div class="card-h"><h3>${c}</h3><span class="muted">${ps.length} items</span></div>
       <div class="tbl-wrap"><table><tbody>${ps.map(p => { const vs = variantsOf(p.id);
-        return `<tr class="click" data-act="editprod" data-id="${p.id}"><td><b>${esc(p.name)}</b>${p.active?'':' <span class="pill mute">Hidden</span>'}</td>
+        return `<tr class="click" data-act="editprod" data-id="${p.id}"><td><div class="namecell">${thumb(p.image_url)}<div><b>${esc(p.name)}</b>${p.active?'':' <span class="pill mute">Hidden</span>'}</div></div></td>
         <td class="num">${vs.map(v => `${v.label?esc(v.label)+' ':''}<b>${pesoShort(v.price)}</b>`).join(' · ')}</td>
         <td class="muted" style="font-size:13px">${vs.some(v => S.recipes.some(r=>r.variant_id===v.id)) ? 'Tracks stock' : 'No stock link'}</td><td class="r"><span class="btn sm ghost">Edit</span></td></tr>`; }).join('')}</tbody></table></div></div>`; }).join('')}
   </div>`;
@@ -761,6 +817,7 @@ function prodModal(id){
   S.draft = draft;
   openModal(`<div class="modal-h"><h2>${id?'Edit menu item':'Add menu item'}</h2></div>
     <div class="modal-b">
+      ${photoPicker(p.image_url)}
       <div class="grid2"><div class="field"><label for="p_name">Name</label><input class="input" id="p_name" value="${esc(p.name)}"></div>
         <div class="field"><label for="p_cat">Category</label><select class="input" id="p_cat">${CATS.map(c => `<option ${p.category===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
       <label class="row"><input type="checkbox" id="p_active" ${p.active?'checked':''}> Show on Sell screen</label>
@@ -769,7 +826,7 @@ function prodModal(id){
       <button class="btn sm" data-act="addvar" style="align-self:flex-start">+ Add size or option</button>
     </div>
     <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveprod" data-id="${id||''}">Save</button></div>`, true);
-  renderVariants();
+  renderVariants(); bindPhotoPicker();
 }
 function syncDraft(){
   document.querySelectorAll('[data-vi]').forEach(el => { const v = S.draft.variants[el.dataset.vi]; const k = el.dataset.k;
@@ -804,6 +861,7 @@ async function saveProd(id, btn){
     let pid = id ? Number(id) : null;
     if (pid) await q(sb.from('products').update({ name, category, active }).eq('id', pid));
     else { const sort = S.products.filter(p => p.category===category).length + 1; pid = (await q(sb.from('products').insert({ name, category, active, sort }).select().single())).id; }
+    await applyPhoto('products', 'menu', pid);
     const keep = vs.filter(v => v.id).map(v => v.id);
     const removed = variantsOf(pid).filter(v => !keep.includes(v.id)).map(v => v.id);
     if (removed.length) await q(sb.from('variants').delete().in('id', removed));
@@ -1034,6 +1092,7 @@ document.addEventListener('click', async e => {
     case 'addrec': syncDraft(); if (!S.items.length) return toast('Add a stock item first in Inventory.', true); S.draft.variants[el.dataset.vi].recipe.push({ item_id:S.items[0].id, qty:1 }); return renderVariants();
     case 'rmrec': { syncDraft(); const [vi,ri] = el.dataset.ri.split('.'); S.draft.variants[vi].recipe.splice(ri,1); return renderVariants(); }
     case 'saveprod': return saveProd(id, el);
+    case 'rmphoto': S.photo.blob = null; S.photo.remove = true; document.getElementById('ph_prev').textContent = 'No photo'; el.hidden = true; document.getElementById('ph_file').value = ''; return;
     case 'range': S.rep.range = el.dataset.v; return viewReports();
     case 'csv': return exportCSV();
     case 'newstaff': return staffModal();
