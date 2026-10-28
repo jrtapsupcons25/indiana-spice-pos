@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Indiana Spice POS</title>
-<meta name="theme-color" content="#17130f">
+<meta name="theme-color" content="#0e0e0d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Indiana POS">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Hind:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@600;700&family=Hind:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 /* Layout: sidebar + work area on desktop, top bar + bottom tabs on phones. Black menu-board ink, saffron for money and actions. */
@@ -23,7 +23,7 @@
   --accent:#f2b705; --accent-ink:#1d1600; --accent-soft:#fdf3cf;
   --chili:#c2361b; --chili-soft:#fbe7e2; --good:#2c7a4b; --good-soft:#e2f2e8; --warn:#9a6a08; --warn-soft:#fbf0d6;
   --side:#17130f; --side-ink:#f3efe8; --side-muted:#a39b90;
-  --f-display:"Rozha One", Georgia, "Times New Roman", serif;
+  --f-display:"Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
   --f-body:"Hind", "Segoe UI", system-ui, -apple-system, sans-serif;
   --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --r:10px; --tab-h:62px;
@@ -297,10 +297,107 @@ tr.click:hover td{background:var(--surface-2)}
   #print{display:block}
   #print .receipt{border:0;max-width:none;padding:0;font-size:11px}
 }
+
+/* ===== Indiana Spice identity: black & white, calm luxury, Indian detail ===== */
+:root{
+  --bg:#f5f5f3; --surface:#ffffff; --surface-2:#fafaf8; --ink:#0f0f0e; --muted:#6b6965; --line:#e3e1dc; --line-2:#cfccc5;
+  --accent:#0f0f0e; --accent-ink:#ffffff; --accent-soft:#eeede9; --gold:#8c7550; --gold-soft:#cdb88f;
+  --side:#0b0b0a; --side-ink:#f4f2ee; --side-muted:#8e8b85;
+  --chili:#a3301f; --chili-soft:#f7e9e6; --good:#2e5c44; --good-soft:#e8efea; --warn:#7a5a1c; --warn-soft:#f3ecdc;
+  --f-display:"Josefin Sans", "Century Gothic", "Avenir Next", system-ui, sans-serif;
+  --jaali:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='1'%3E%3Crect x='15' y='15' width='18' height='18'/%3E%3Crect x='15' y='15' width='18' height='18' transform='rotate(45 24 24)'/%3E%3Cpath d='M0 0L12 12M48 0L36 12M0 48L12 36M48 48L36 36'/%3E%3Ccircle cx='24' cy='24' r='3'/%3E%3C/g%3E%3C/svg%3E"); --mandala:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.14' stroke-width='1'%3E%3Ccircle cx='100' cy='100' r='14'/%3E%3Ccircle cx='100' cy='100' r='22'/%3E%3Ccircle cx='100' cy='100' r='50'/%3E%3Ccircle cx='100' cy='100' r='84'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(0.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(22.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(45.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(67.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(90.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(112.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(135.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(157.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(180.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(202.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(225.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(247.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(270.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(292.5 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(315.0 100 100)'/%3E%3Cellipse cx='100' cy='62' rx='7' ry='24' transform='rotate(337.5 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(11.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(56.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(101.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(146.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(191.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(236.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(281.25 100 100)'/%3E%3Cpath d='M100 14C112 30 112 44 100 52C88 44 88 30 100 14Z' transform='rotate(326.25 100 100)'/%3E%3Ccircle cx='192.0' cy='100.0' r='2'/%3E%3Ccircle cx='190.2' cy='117.9' r='2'/%3E%3Ccircle cx='185.0' cy='135.2' r='2'/%3E%3Ccircle cx='176.5' cy='151.1' r='2'/%3E%3Ccircle cx='165.1' cy='165.1' r='2'/%3E%3Ccircle cx='151.1' cy='176.5' r='2'/%3E%3Ccircle cx='135.2' cy='185.0' r='2'/%3E%3Ccircle cx='117.9' cy='190.2' r='2'/%3E%3Ccircle cx='100.0' cy='192.0' r='2'/%3E%3Ccircle cx='82.1' cy='190.2' r='2'/%3E%3Ccircle cx='64.8' cy='185.0' r='2'/%3E%3Ccircle cx='48.9' cy='176.5' r='2'/%3E%3Ccircle cx='34.9' cy='165.1' r='2'/%3E%3Ccircle cx='23.5' cy='151.1' r='2'/%3E%3Ccircle cx='15.0' cy='135.2' r='2'/%3E%3Ccircle cx='9.8' cy='117.9' r='2'/%3E%3Ccircle cx='8.0' cy='100.0' r='2'/%3E%3Ccircle cx='9.8' cy='82.1' r='2'/%3E%3Ccircle cx='15.0' cy='64.8' r='2'/%3E%3Ccircle cx='23.5' cy='48.9' r='2'/%3E%3Ccircle cx='34.9' cy='34.9' r='2'/%3E%3Ccircle cx='48.9' cy='23.5' r='2'/%3E%3Ccircle cx='64.8' cy='15.0' r='2'/%3E%3Ccircle cx='82.1' cy='9.8' r='2'/%3E%3Ccircle cx='100.0' cy='8.0' r='2'/%3E%3Ccircle cx='117.9' cy='9.8' r='2'/%3E%3Ccircle cx='135.2' cy='15.0' r='2'/%3E%3Ccircle cx='151.1' cy='23.5' r='2'/%3E%3Ccircle cx='165.1' cy='34.9' r='2'/%3E%3Ccircle cx='176.5' cy='48.9' r='2'/%3E%3Ccircle cx='185.0' cy='64.8' r='2'/%3E%3Ccircle cx='190.2' cy='82.1' r='2'/%3E%3C/g%3E%3C/svg%3E"); --arch:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 75' preserveAspectRatio='none'%3E%3Cpath fill='%23fff' d='M0 75V30C0 22 6 18 12 16C20 13 28 8 34 4C40 0 46 0 50 0C54 0 60 0 66 4C72 8 80 13 88 16C94 18 100 22 100 30V75Z'/%3E%3C/svg%3E"); --flower:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M10 1C12 5 12 8 10 10C8 8 8 5 10 1Z'/%3E%3Cpath d='M10 19C8 15 8 12 10 10C12 12 12 15 10 19Z'/%3E%3Cpath d='M1 10C5 8 8 8 10 10C8 12 5 12 1 10Z'/%3E%3Cpath d='M19 10C15 12 12 12 10 10C12 8 15 8 19 10Z'/%3E%3Ccircle cx='10' cy='10' r='1.6'/%3E%3C/g%3E%3C/svg%3E"); --flower-ink:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%230f0f0e'%3E%3Cpath d='M10 1C12 5 12 8 10 10C8 8 8 5 10 1Z'/%3E%3Cpath d='M10 19C8 15 8 12 10 10C12 12 12 15 10 19Z'/%3E%3Cpath d='M1 10C5 8 8 8 10 10C8 12 5 12 1 10Z'/%3E%3Cpath d='M19 10C15 12 12 12 10 10C12 8 15 8 19 10Z'/%3E%3Ccircle cx='10' cy='10' r='1.6'/%3E%3C/g%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b0b0a; --surface:#141413; --surface-2:#1a1a18; --ink:#f4f2ee; --muted:#9b978f; --line:#282725; --line-2:#3a3834;
+  --accent:#f4f2ee; --accent-ink:#0f0f0e; --accent-soft:#222120; --gold:#cdb88f; --gold-soft:#8c7550; --side:#050505;
+  --chili:#e2785f; --chili-soft:#2c1915; --good:#80c09a; --good-soft:#16241b; --warn:#d8b46a; --warn-soft:#2a2414; --flower-ink:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M10 1C12 5 12 8 10 10C8 8 8 5 10 1Z'/%3E%3Cpath d='M10 19C8 15 8 12 10 10C12 12 12 15 10 19Z'/%3E%3Cpath d='M1 10C5 8 8 8 10 10C8 12 5 12 1 10Z'/%3E%3Cpath d='M19 10C15 12 12 12 10 10C12 8 15 8 19 10Z'/%3E%3Ccircle cx='10' cy='10' r='1.6'/%3E%3C/g%3E%3C/svg%3E"); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b0b0a; --surface:#141413; --surface-2:#1a1a18; --ink:#f4f2ee; --muted:#9b978f; --line:#282725; --line-2:#3a3834;
+  --accent:#f4f2ee; --accent-ink:#0f0f0e; --accent-soft:#222120; --gold:#cdb88f; --gold-soft:#8c7550; --side:#050505;
+  --chili:#e2785f; --chili-soft:#2c1915; --good:#80c09a; --good-soft:#16241b; --warn:#d8b46a; --warn-soft:#2a2414; --flower-ink:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M10 1C12 5 12 8 10 10C8 8 8 5 10 1Z'/%3E%3Cpath d='M10 19C8 15 8 12 10 10C12 12 12 15 10 19Z'/%3E%3Cpath d='M1 10C5 8 8 8 10 10C8 12 5 12 1 10Z'/%3E%3Cpath d='M19 10C15 12 12 12 10 10C12 8 15 8 19 10Z'/%3E%3Ccircle cx='10' cy='10' r='1.6'/%3E%3C/g%3E%3C/svg%3E"); color-scheme:dark}
+#app{min-height:100%}
+::selection{background:var(--ink);color:var(--bg)}
+/* logo */
+.logo{display:block;width:100%;height:auto}
+.side .logo-wrap{padding:4px 10px 18px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:14px}
+.side .logo-wrap small{display:block;text-align:center;margin-top:8px;font:600 10px/1 var(--f-display);letter-spacing:.34em;text-transform:uppercase;color:var(--gold-soft)}
+.topbar .logo{width:auto;height:40px}
+/* type */
+.page-head h1{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.14em;text-transform:uppercase;line-height:1.15}
+.page-head .sub{margin-top:4px}
+.cart-h h2,.modal-h h2{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.14em;text-transform:uppercase}
+.card-h h3{font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+.lbl,.field label,th,.kpi .k{font-family:var(--f-display);font-weight:600;letter-spacing:.16em}
+/* calm surfaces, crisp corners */
+.card,.kpi,.prod,.modal,.btn,.input,.seg,.chip,.pill,.stepper,.change,.thumb,.toast,.cartfab,.pickbranch button,.photo-pick .pv,.vblock,.variant-pick button{border-radius:3px}
+.seg button{border-radius:2px}
+.btn{font-weight:500;letter-spacing:.04em;border-color:var(--line-2)}
+.btn.primary,.btn.dark{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary:hover{filter:none;opacity:.86}
+.seg button.on,.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip{font-family:var(--f-display);font-weight:600;letter-spacing:.1em;text-transform:uppercase;font-size:12px;padding:8px 14px}
+.pill{font-weight:500}
+/* sidebar: black lacquer, jaali, mandala corner */
+.side{background-color:var(--side);background-image:var(--mandala),var(--jaali);background-repeat:no-repeat,repeat;background-size:280px 280px,48px 48px;background-position:-100px calc(100% + 100px),0 0;border-right:1px solid #1c1b19}
+.nav{border-radius:2px;font-weight:500;letter-spacing:.05em;border-left:2px solid transparent}
+.nav:hover{background:rgba(255,255,255,.05)}
+.nav.on{background:rgba(255,255,255,.08);color:#fff;border-left-color:#fff}
+.whoami{border-top-color:rgba(255,255,255,.08)}
+.whoami .r{color:var(--gold-soft);letter-spacing:.26em;font-family:var(--f-display);font-weight:600}
+.whoami button,.branchsel{border-radius:2px}
+.branchbox .lbl{font-size:10px}
+.branchsel{background:rgba(255,255,255,.06)}
+.branchfix{color:#fff}
+.topbar{background-color:var(--side);background-image:var(--jaali);background-size:48px 48px;padding-block:6px}
+.tabbar button.on svg{color:var(--ink)}
+.tabbar button.on{color:var(--ink)}
+.tabbar button.on span{border-bottom:1.5px solid var(--ink)}
+/* login: logo on black, mandala corners */
+.auth{min-height:100vh;min-height:100dvh;align-content:center;gap:22px;background-color:var(--side);background-image:var(--mandala),var(--mandala),var(--jaali);background-repeat:no-repeat,no-repeat,repeat;background-size:440px 440px,440px 440px,48px 48px;background-position:-170px -170px,calc(100% + 170px) calc(100% + 170px),0 0}
+.auth-logo{width:min(330px,80vw);height:auto;display:block;margin:0 auto}
+.auth-card{border-radius:3px;box-shadow:0 30px 80px rgba(0,0,0,.5);max-width:390px}
+.auth-head{border-bottom:0;padding:0}
+.auth-head .ttl{font:700 14px/1 var(--f-display);letter-spacing:.24em;text-transform:uppercase;text-align:center;display:flex;align-items:center;gap:10px}
+.auth-head .ttl::before,.auth-head .ttl::after{content:"";flex:1;height:14px;background:var(--flower-ink) center/14px 14px no-repeat,linear-gradient(var(--line-2),var(--line-2)) center/100% 1px no-repeat}
+/* category banner, like the menu board ribbons */
+.cat-title{font:700 15px/1 var(--f-display);letter-spacing:.2em;text-transform:uppercase;gap:0;margin-top:10px}
+.cat-title::after{display:none}
+.cat-title span.ribbon{display:inline-flex;align-items:center;gap:12px;background:var(--ink);color:var(--bg);padding:11px 30px 9px;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%)}
+.cat-title span.ribbon::before,.cat-title span.ribbon::after{content:"";width:13px;height:13px;background:var(--flower) center/contain no-repeat}
+.cat-title .rule{flex:1;height:1px;background:var(--line-2);margin-left:12px}
+/* product cards */
+.prod{padding:14px;gap:6px;transition:border-color .15s, box-shadow .15s, transform .08s}
+.prod:hover{border-color:var(--ink);box-shadow:0 8px 22px rgba(15,15,14,.07)}
+.prod .nm{font-weight:600;letter-spacing:.01em}
+.prod .pr{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.02em}
+.prod .pr span{font-family:var(--f-body);font-weight:500;font-size:12px;letter-spacing:.04em}
+.prod.has-ph{padding-top:10px}
+.prod .ph{margin:0 0 6px;width:100%;border:0;background:var(--surface-2);-webkit-mask:var(--arch) center/100% 100% no-repeat;mask:var(--arch) center/100% 100% no-repeat}
+.prod .incart{background:var(--ink);color:var(--bg);border-radius:2px}
+.checkout,.cart-pay{background:var(--surface-2)}
+.totals .grand{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.04em;border-top:1px solid var(--line-2)}
+.charge{font-family:var(--f-display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:16px}
+.cartfab{background:var(--ink);color:var(--bg)}
+.cartfab .amt{color:var(--gold-soft)}
+/* kpis & charts */
+.kpi .v{font-family:var(--f-display);font-weight:700;letter-spacing:.02em}
+.kpi.hero{background-color:var(--side);background-image:var(--mandala);background-repeat:no-repeat;background-size:190px;background-position:calc(100% + 60px) -55px;color:#f4f2ee;border-color:var(--side)}
+.kpi.hero .v{color:#fff}
+.kpi.hero .k{color:var(--gold-soft);opacity:1}
+.bar-row .fill{background:var(--ink)}
+.bar-row .fill.ink{background:var(--gold)}
+.bar-row .track{border-radius:0;height:6px}
+.pickbranch b{font-family:var(--f-display);font-weight:700;letter-spacing:.06em}
+.overlay{background:rgba(8,8,7,.62);backdrop-filter:blur(2px)}
+.modal-h{border-bottom-color:var(--line)}
+@media (max-width:600px){.modal{border-radius:12px 12px 0 0}}
+/* receipt */
+.receipt .rlogo{display:block;width:150px;height:auto;margin:0 auto 4px}
+@media print{.receipt .rlogo{width:42mm}}
 </style>
 </head>
 <body>
-<div id="app"><div class="auth"><div class="brand" style="color:var(--side-ink)">Indiana Spice<small>Loading POS…</small></div></div></div>
+<div id="app"><div class="auth"><img class="auth-logo" src="logo-white.png" alt="Indiana Spice"></div></div>
 <div id="print"></div>
 <script>
 /* ===================== config ===================== */
@@ -422,8 +519,8 @@ async function callStaff(body){
 async function showAuth(msg){
   let setup = false;
   try { setup = (await callStaff({ action:'status' })).needsSetup; } catch(_){}
-  app.innerHTML = `<div class="auth"><form class="auth-card" id="authForm" novalidate>
-    <div class="auth-head"><div class="brand">Indiana Spice<small>Point of Sale</small></div></div>
+  app.innerHTML = `<div class="auth"><img class="auth-logo" src="logo-white.png" alt="Indiana Spice · Real Indian Taste"><form class="auth-card" id="authForm" novalidate>
+    <div class="auth-head"><div class="ttl">${setup ? 'Owner setup' : 'Staff sign in'}</div></div>
     ${setup ? `<div class="note">First time here. Create the <b>owner / admin</b> account. You can add Sales Officers after you sign in.</div>
       <div class="field"><label for="a_name">Your name</label><input class="input" id="a_name" autocomplete="name" required></div>` : ''}
     ${msg ? `<div class="err">${esc(msg)}</div>` : '<div class="err" id="authErr" hidden></div>'}
@@ -528,13 +625,13 @@ function renderShell(){
   const mob = isAdmin() ? ['sell','sales','inventory','reports','more'] : ['sell','sales','inventory','more'];
   app.innerHTML = `<div class="shell">
     <aside class="side">
-      <div class="brand">Indiana Spice<small>POS · ${isAdmin()?'Admin':'Sales Officer'}</small></div>
+      <div class="logo-wrap"><img class="logo" src="logo-white.png" alt="Indiana Spice"><small>Point of Sale</small></div>
       <div class="branchbox"><span class="lbl">Branch</span>${branchSelect()}</div>
       ${desk.map(v => `<a class="nav" href="#${v}" data-nav="${v}">${ICON[v]}<span>${viewLabel(v)}</span></a>`).join('')}
       <div class="whoami"><span class="r">${isAdmin()?'Admin':'Sales Officer'}</span><b>${esc(S.me.full_name)}</b><span style="color:var(--side-muted)">@${esc(S.me.username)}</span>
         <button data-act="signout">Sign out</button></div>
     </aside>
-    <div class="topbar"><div class="brand">Indiana Spice</div><div class="who">${isAdmin() ? branchSelect() : `<b>${esc(S.me.full_name)}</b>${esc(branchName(S.me.branch_id))}`}</div></div>
+    <div class="topbar"><img class="logo" src="logo-white.png" alt="Indiana Spice"><div class="who">${isAdmin() ? branchSelect() : `<b>${esc(S.me.full_name)}</b>${esc(branchName(S.me.branch_id))}`}</div></div>
     <main id="main"></main>
     <nav class="tabbar">${mob.map(v => `<button data-nav="${v}">${ICON[v]}<span>${viewLabel(v)}</span></button>`).join('')}</nav>
   </div>`;
@@ -580,7 +677,7 @@ function renderProducts(){
   for (const c of cats){
     const ps = S.products.filter(p => p.active && p.category === c && (!term || p.name.toLowerCase().includes(term)) && variantsOf(p.id).some(v=>v.active));
     if (!ps.length) continue;
-    html += `<h2 class="cat-title">${c}</h2><div class="grid">` + ps.map(p => {
+    html += `<h2 class="cat-title"><span class="ribbon">${c}</span><span class="rule"></span></h2><div class="grid">` + ps.map(p => {
       const vs = variantsOf(p.id).filter(v => v.active);
       const left = vs.map(v => servingsLeft(v.id)).filter(x => x !== null);
       const min = left.length ? Math.min(...left) : null;
@@ -672,7 +769,7 @@ async function charge(btn){
 function receiptHTML(s, lines){
   const discLbl = s.discount_type==='senior_pwd' ? `Senior/PWD 20% (ID ${esc(s.discount_ref||'')})` : 'Promo discount';
   return `<div class="receipt">
-    <div class="c"><div class="t">${STORE.name}</div><div>${STORE.tagline}</div><div>${esc(branchName(s.branch_id))}</div>${branchById(s.branch_id)?.address?`<div>${esc(branchById(s.branch_id).address)}</div>`:''}<div>${STORE.phone}</div></div><hr>
+    <div class="c"><img class="rlogo" src="logo-black.png" alt="${STORE.name}"><div>${esc(branchName(s.branch_id))}</div>${branchById(s.branch_id)?.address?`<div>${esc(branchById(s.branch_id).address)}</div>`:''}<div>${STORE.phone}</div></div><hr>
     <div class="l"><span>${esc(s.sale_no)}</span><span>${esc(s.order_type)}</span></div>
     <div>${fmtDT(s.created_at)}</div><div>Cashier: ${esc(nameOf(s.cashier_id))}</div>
     ${s.customer ? `<div>Customer: ${esc(s.customer)}</div>` : ''}<hr>
@@ -999,7 +1096,7 @@ function columnChart(labels, values, sub){
   for (let i=0;i<=4;i++){ const v = nice*i/4; g += `<line x1="${padL}" x2="${W-4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL-6}" y="${y(v)+4}" text-anchor="end">${v>=1000?(v/1000)+'k':v}</text>`; }
   const step = Math.ceil(n/12);
   values.forEach((v,i) => { const x = padL + i*bw + bw*.15, w = bw*.7;
-    g += `<rect x="${x}" y="${y(v)}" width="${w}" height="${Math.max(0,H-padB-y(v))}" rx="2" fill="${v===Math.max(...values)&&v>0?'var(--accent)':'var(--ink)'}"><title>${labels[i]}: ${peso(v)}</title></rect>`;
+    g += `<rect x="${x}" y="${y(v)}" width="${w}" height="${Math.max(0,H-padB-y(v))}" rx="2" fill="${v===Math.max(...values)&&v>0?'var(--gold)':'var(--ink)'}"><title>${labels[i]}: ${peso(v)}</title></rect>`;
     if (i % step === 0) g += `<text x="${x+w/2}" y="${H-8}" text-anchor="middle">${labels[i]}</text>`; });
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(sub)}">${g}</svg></div>`;
 }
@@ -1036,7 +1133,7 @@ function renderReport(){
       <div class="kpi"><span class="k">Voids</span><span class="v num">${voids.length}</span><span class="s num">${peso(voids.reduce((a,s)=>a+Number(s.total),0))}</span></div>
     </div>
     <div class="two">
-      <div class="card"><div class="card-h"><h3>${chartTitle}</h3><span class="spacer"></span><span class="muted" style="font-size:13px">Highest in saffron</span></div><div class="card-b">${ok.length ? chart : '<div class="empty">No sales in this period yet.</div>'}</div></div>
+      <div class="card"><div class="card-h"><h3>${chartTitle}</h3><span class="spacer"></span><span class="muted" style="font-size:13px">Busiest in gold</span></div><div class="card-b">${ok.length ? chart : '<div class="empty">No sales in this period yet.</div>'}</div></div>
       <div class="card"><div class="card-h"><h3>${curBranch() ? 'Payment methods' : 'Sales by branch'}</h3></div><div class="card-b">${curBranch() ? '' : barList(byBranch, {ink:true}) + '<div class="lbl" style="margin:16px 0 8px">Payment methods</div>'}${barList(sumBy(ok, s=>s.payment_method, s=>Number(s.total)))}
         <div class="lbl" style="margin:16px 0 8px">Order type</div>${barList(sumBy(ok, s=>s.order_type, s=>Number(s.total)), {ink:true})}
         <div class="lbl" style="margin:16px 0 8px">Category</div>${barList(sumBy(lines, l=>l.category, l=>Number(l.line_total)))}</div></div>
