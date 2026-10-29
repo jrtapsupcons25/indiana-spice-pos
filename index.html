@@ -930,14 +930,14 @@ async function viewInventory(){
       <span class="spacer"></span>${isAdmin() ? '<button class="btn primary" data-act="newitem">Add stock item</button>' : ''}</div>
     <div class="row">${b ? `${out ? `<span class="pill bad">${out} out of stock</span>` : ''}${low ? `<span class="pill warn">${low} running low</span>` : ''}${!out && !low ? '<span class="pill good">All items above reorder level</span>' : ''}`
         : '<span class="muted">Comparing every branch. Pick one branch at the top to update its stock.</span>'}
-      <span class="spacer"></span><div class="seg" style="min-width:220px"><button data-act="invtab" data-v="stock" class="${S.invTab==='stock'?'on':''}">Stock on hand</button><button data-act="invtab" data-v="log" class="${S.invTab==='log'?'on':''}">Movement log</button></div></div>
+      <span class="spacer"></span>${isAdmin() && b && S.invTab==='stock' && S.items.some(i => !i.active) ? `<button class="btn sm ghost" data-act="togglehidden">${S.showHidden ? 'Hide' : 'Show'} hidden items (${S.items.filter(i => !i.active).length})</button>` : ''}<div class="seg" style="min-width:220px"><button data-act="invtab" data-v="stock" class="${S.invTab==='stock'?'on':''}">Stock on hand</button><button data-act="invtab" data-v="log" class="${S.invTab==='log'?'on':''}">Movement log</button></div></div>
     <div class="card" id="invBody"></div>
   </div>`;
   S.invTab === 'log' ? renderMoveLog() : (b ? renderStock() : renderMatrix());
 }
 function renderStock(){
   const b = curBranch();
-  const items = S.items.filter(i => i.active || isAdmin());
+  const items = S.items.filter(i => i.active || (isAdmin() && S.showHidden));
   const usedBy = id => S.recipes.filter(r => r.item_id === id).length;
   document.getElementById('invBody').innerHTML = !items.length ? '<div class="empty">No stock items yet. Add your first item to start tracking.</div>' :
   `<div class="tbl-wrap resp"><table><thead><tr><th>Item</th><th class="r">On hand</th><th class="r">Reorder at</th><th>Status</th>${isAdmin()?'<th class="r">Unit cost</th><th class="r">Value</th><th></th>':''}</tr></thead><tbody>
@@ -1008,7 +1008,7 @@ function itemModal(id){
       <div class="grid2"><div class="field"><label for="it_unit">Unit</label><input class="input" id="it_unit" value="${esc(it.unit)}" placeholder="pc, serving, kg, set"></div>
         <div class="field"><label for="it_reorder">${id && b ? `Reorder level at ${esc(branchName(b))}` : 'Reorder level (all branches)'}</label><input class="input num" id="it_reorder" type="number" min="0" step="any" value="${reorder}"></div></div>
       <div class="grid2"><div class="field"><label for="it_cost">Cost per unit (₱)</label><input class="input num" id="it_cost" type="number" min="0" step="any" value="${it.unit_cost}"></div>
-        ${id ? `<label class="row" style="align-self:end;min-height:40px"><input type="checkbox" id="it_active" ${it.active?'checked':''}> Active</label>` : ''}</div>
+        ${id ? `<label class="row" style="align-self:end;min-height:40px"><input type="checkbox" id="it_active" ${it.active?'checked':''}> Show in Inventory</label>` : ''}</div>
       <div class="muted" style="font-size:13px">${id ? 'Name, unit, cost and photo apply to every branch.' : 'The item is added to every branch at 0. Use Update stock to record the first delivery or batch.'}</div>
     </div>
     <div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveitem" data-id="${id||''}">Save</button></div>`);
@@ -1075,7 +1075,7 @@ function renderVariants(){
       ${multi ? `<button class="btn sm ghost" data-act="rmvar" data-vi="${vi}">Remove</button>` : '<span></span>'}
     </div>
     <div class="lbl" style="font-size:11px">Uses from stock per order</div>
-    ${v.recipe.map((r,ri) => `<div class="rgrid"><select class="input" data-ri="${vi}.${ri}" data-k="item">${S.items.map(i => `<option value="${i.id}" ${i.id===r.item_id?'selected':''}>${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
+    ${v.recipe.map((r,ri) => `<div class="rgrid"><select class="input" data-ri="${vi}.${ri}" data-k="item">${S.items.filter(i => i.active || i.id===r.item_id).map(i => `<option value="${i.id}" ${i.id===r.item_id?'selected':''}>${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
       <input class="input num" data-ri="${vi}.${ri}" data-k="qty" type="number" min="0" step="any" value="${esc(r.qty)}"><button class="btn sm ghost" data-act="rmrec" data-ri="${vi}.${ri}">✕</button></div>`).join('') || '<div class="muted" style="font-size:13px">Not linked to stock. Sales will not reduce inventory.</div>'}
     <button class="btn sm" data-act="addrec" data-vi="${vi}" style="align-self:flex-start">+ Link stock item</button>
   </div>`).join('');
@@ -1836,6 +1836,7 @@ document.addEventListener('click', async e => {
     case 'cancelvoid': document.getElementById('voidBox').hidden = true; document.querySelector('[data-act=askvoid]').hidden = false; return;
     case 'dovoid': return doVoid(id, el);
     case 'invtab': S.invTab = el.dataset.v; return viewInventory();
+    case 'togglehidden': S.showHidden = !S.showHidden; return viewInventory();
     case 'stock': return stockModal(id);
     case 'sttype': { const o = document.querySelector('.overlay'); o.dataset.st = el.dataset.v; document.querySelectorAll('[data-act=sttype]').forEach(b => b.classList.toggle('on', b===el));
       const it = document.querySelector('[data-act=savestock]'); const unit = itemById(Number(it.dataset.id)).unit;
@@ -1848,7 +1849,7 @@ document.addEventListener('click', async e => {
     case 'editprod': return prodModal(id || null);
     case 'addvar': syncDraft(); S.draft.variants.push({ label:'', price:'', active:true, recipe:[] }); return renderVariants();
     case 'rmvar': syncDraft(); S.draft.variants.splice(el.dataset.vi,1); return renderVariants();
-    case 'addrec': syncDraft(); if (!S.items.length) return toast('Add a stock item first in Inventory.', true); S.draft.variants[el.dataset.vi].recipe.push({ item_id:S.items[0].id, qty:1 }); return renderVariants();
+    case 'addrec': syncDraft(); if (!S.items.length) return toast('Add a stock item first in Inventory.', true); S.draft.variants[el.dataset.vi].recipe.push({ item_id:(S.items.find(i => i.active) || S.items[0]).id, qty:1 }); return renderVariants();
     case 'rmrec': { syncDraft(); const [vi,ri] = el.dataset.ri.split('.'); S.draft.variants[vi].recipe.splice(ri,1); return renderVariants(); }
     case 'saveprod': return saveProd(id, el);
     case 'xrange': { const k = el.dataset.k; if (el.dataset.v === 'custom' && !S[k].from){ const [f,t] = rangeDates(S[k]); S[k].from = f; S[k].to = t; } S[k].range = el.dataset.v; return route(); }

@@ -1,5 +1,5 @@
 // Indiana Spice POS: caches the app shell so it opens fast. Sales always go to the cloud.
-const CACHE = 'indiana-pos-v6';
+const CACHE = 'indiana-pos-v7';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './logo-white.png', './logo-black.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
