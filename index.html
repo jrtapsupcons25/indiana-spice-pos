@@ -394,6 +394,48 @@ tr.click:hover td{background:var(--surface-2)}
 /* receipt */
 .receipt .rlogo{display:block;width:150px;height:auto;margin:0 auto 4px}
 @media print{.receipt .rlogo{width:42mm}}
+
+/* ===== cash, expenses, payroll, profit ===== */
+.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1000px){.kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cash-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:1000px){.cash-grid{grid-template-columns:1fr}}
+.two > *{min-width:0}
+.ledger{display:flex;flex-direction:column}
+.lrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:15px}
+.lrow.zero{color:var(--muted)}
+.lrow.head{border-bottom:0;padding-bottom:2px;font-weight:700}
+.lrow.sub span:first-child{padding-left:14px;color:var(--muted)}
+.lrow.strong{font-weight:700}
+.lrow.total{border-bottom:0;border-top:1.5px solid var(--ink);margin-top:6px;padding-top:12px;font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.03em}
+.lrow.total.neg{color:var(--chili)}
+.card-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.act .arow{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.act .arow:last-child{border-bottom:0}
+.act .muted{font-size:13px}
+.act .sm{font-size:12px}
+.act .r{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right;flex:none}
+.neg{color:var(--chili);font-weight:700}
+.pos{color:var(--good);font-weight:700}
+.change.over{background:var(--warn-soft);color:var(--warn)}
+.denoms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.denom{display:grid;grid-template-columns:62px 1fr 64px;align-items:center;gap:8px}
+.denom span:last-child{text-align:right;font-size:13px}
+@media (max-width:420px){.denoms{grid-template-columns:1fr}}
+.drawer-note{background:var(--warn-soft);color:var(--warn);padding:9px 12px;border-radius:3px;font-size:14px}
+.drawer-note a{color:inherit;font-weight:700}
+.paygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+.paycard{background:var(--surface);border:1px solid var(--line);border-radius:3px;display:flex;flex-direction:column;min-width:0}
+.pc-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+.pc-b{padding:12px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
+.pc-f{padding:10px 14px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+.pc-f .btn.primary{width:100%}
+.netline{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.03em;padding-top:8px;border-top:1px solid var(--line-2)}
+.tabs-seg{width:min(100%,420px)}
+.tabs-seg button{white-space:nowrap}
+.mi{display:inline-grid;place-items:center;width:22px;height:22px}
+.mi svg{width:20px;height:20px}
+.li.namecell,.li .namecell{gap:10px}
 </style>
 </head>
 <body>
@@ -416,7 +458,8 @@ const S = {
   co:{ orderType:'Dine-in', customer:'', discType:'none', discRef:'', discAmt:'', method:'Cash', payRef:'', tendered:'' },
   salesDate:null, salesCashier:'', salesQ:'', sales:[],
   rep:{ range:'today', from:null, to:null }, repData:null,
-  invTab:'stock', branches:[], stock:[], branchSel:null
+  invTab:'stock', branches:[], stock:[], branchSel:null,
+  exp:{ range:'today' }, pr:{ range:'month' }, payh:{ range:'7d' }, cashDate:null, payDate:null, payTab:'daily', payForm:{}, mob:[]
 };
 const app = document.getElementById('app');
 
@@ -448,15 +491,15 @@ async function shrinkImage(file){
     return await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.82));
   } finally { URL.revokeObjectURL(url); }
 }
-async function uploadPhoto(folder, id, blob){
+async function uploadPhoto(folder, id, blob, upsert = true){
   const path = `${folder}/${id}-${Date.now()}.jpg`;
-  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert:true });
+  const { error } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg', upsert });
   if (error) throw error;
   return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
 }
-function photoPicker(current){
+function photoPicker(current, label = 'Photo'){
   S.photo = { blob:null, remove:false, current:current||null };
-  return `<div class="field"><span class="lbl">Photo</span><div class="photo-pick">
+  return `<div class="field"><span class="lbl">${esc(label)}</span><div class="photo-pick">
     <div class="pv" id="ph_prev">${current ? `<img src="${esc(current)}" alt="">` : 'No photo'}</div>
     <div class="row"><label class="btn sm" for="ph_file">${current ? 'Change photo' : 'Add photo'}</label>
       <input type="file" id="ph_file" accept="image/*">
@@ -494,19 +537,28 @@ const ICON = {
   reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   staff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 5.5 5.8"/></svg>',
   branches:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l2-5h14l2 5"/><path d="M4 10v10h16V10"/><path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M10 20v-5h4v5"/></svg>',
+  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
+  expenses:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H19v14H6.5A2.5 2.5 0 0 1 4 16.5z"/><path d="M4 7.5A2.5 2.5 0 0 0 6.5 10H19"/><path d="M15.5 14.5h.01"/></svg>',
+  payroll:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="10.5" r="2.3"/><path d="M5.5 17a3.6 3.6 0 0 1 7 0"/><path d="M15 9.5h3M15 13h3"/></svg>',
+  profit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 7-8"/><path d="M15 7h5v5"/><path d="M3 21h18"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>'
 };
 const VIEWS = {
   sell:{ label:'Sell', roles:['admin','sales'] },
-  sales:{ label:'Sales', salesLabel:'My Sales', roles:['admin','sales'] },
-  inventory:{ label:'Inventory', salesLabel:'Stock', roles:['admin','sales'] },
-  menu:{ label:'Menu', roles:['admin'] },
-  reports:{ label:'Reports', roles:['admin'] },
-  staff:{ label:'Staff', roles:['admin'] },
-  branches:{ label:'Branches', roles:['admin'] },
+  sales:{ label:'Sales', salesLabel:'My Sales', roles:['admin','sales'], desc:'Every sale, reprint and void' },
+  cash:{ label:'Cash On Hand', short:'Cash', roles:['admin','sales'], desc:'Open and close the cash drawer' },
+  expenses:{ label:'Expenses', roles:['admin','sales'], desc:'Record and review spending' },
+  inventory:{ label:'Inventory', salesLabel:'Stock', roles:['admin','sales'], desc:'Stock on hand per branch' },
+  payroll:{ label:'Payroll', roles:['admin'], desc:'Daily pay and cash advances' },
+  menu:{ label:'Menu', roles:['admin'], desc:'Prices, sizes and stock links' },
+  reports:{ label:'Sales Report', short:'Sales', roles:['admin'], desc:'Best sellers, payment methods, busy hours' },
+  profit:{ label:'Profit Report', short:'Profit', roles:['admin'], desc:'Sales minus expenses and payroll' },
+  staff:{ label:'Staff', roles:['admin'], desc:'Accounts and daily rates' },
+  branches:{ label:'Branches', roles:['admin'], desc:'Add or edit branches' },
   more:{ label:'More', roles:['admin','sales'], mobileOnly:true }
 };
 const viewLabel = v => (!isAdmin() && VIEWS[v].salesLabel) || VIEWS[v].label;
+const tabLabel = v => (!isAdmin() && VIEWS[v].salesLabel) || VIEWS[v].short || VIEWS[v].label;
 const canSee = v => VIEWS[v] && VIEWS[v].roles.includes(S.me.role);
 
 /* ===================== auth ===================== */
@@ -622,7 +674,7 @@ async function boot(){
 }
 function renderShell(){
   const desk = Object.keys(VIEWS).filter(v => canSee(v) && !VIEWS[v].mobileOnly);
-  const mob = isAdmin() ? ['sell','sales','inventory','reports','more'] : ['sell','sales','inventory','more'];
+  const mob = S.mob = isAdmin() ? ['sell','cash','reports','profit','more'] : ['sell','sales','cash','inventory','more'];
   app.innerHTML = `<div class="shell">
     <aside class="side">
       <div class="logo-wrap"><img class="logo" src="logo-white.png" alt="Indiana Spice"><small>Point of Sale</small></div>
@@ -633,7 +685,7 @@ function renderShell(){
     </aside>
     <div class="topbar"><img class="logo" src="logo-white.png" alt="Indiana Spice"><div class="who">${isAdmin() ? branchSelect() : `<b>${esc(S.me.full_name)}</b>${esc(branchName(S.me.branch_id))}`}</div></div>
     <main id="main"></main>
-    <nav class="tabbar">${mob.map(v => `<button data-nav="${v}">${ICON[v]}<span>${viewLabel(v)}</span></button>`).join('')}</nav>
+    <nav class="tabbar">${mob.map(v => `<button data-nav="${v}">${ICON[v]}<span>${tabLabel(v)}</span></button>`).join('')}</nav>
   </div>`;
 }
 function route(){
@@ -641,9 +693,9 @@ function route(){
   if (!canSee(v)) v = 'sell';
   if (v === 'more' && window.innerWidth > 860) v = 'sell';
   S.view = v;
-  document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === v || (v==='menu'||v==='staff'||v==='branches') && b.dataset.nav==='more' && b.closest('.tabbar')));
+  document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === v || (b.dataset.nav==='more' && b.closest('.tabbar') && !S.mob.includes(v))));
   const main = document.getElementById('main'); main.scrollTop = 0;
-  ({ sell:viewSell, sales:viewSales, inventory:viewInventory, menu:viewMenu, reports:viewReports, staff:viewStaff, branches:viewBranches, more:viewMore })[v]();
+  ({ sell:viewSell, sales:viewSales, inventory:viewInventory, menu:viewMenu, reports:viewReports, staff:viewStaff, branches:viewBranches, cash:viewCash, expenses:viewExpenses, payroll:viewPayroll, profit:viewProfit, more:viewMore })[v]();
 }
 window.addEventListener('hashchange', () => S.me && route());
 const main = () => document.getElementById('main');
@@ -658,6 +710,7 @@ function viewSell(){
   }
   main().innerHTML = `<div class="sell">
     <section class="catalog">
+      <div class="drawer-note" id="drawerNote" hidden></div>
       <div class="catbar">
         <input class="input" id="s_q" type="search" placeholder="Search menu" value="${esc(S.q)}" autocomplete="off">
         ${['All',...CATS].map(c => `<button class="chip ${S.cat===c?'on':''}" data-act="cat" data-v="${c}">${c}</button>`).join('')}
@@ -667,6 +720,11 @@ function viewSell(){
     <aside class="cart ${S.cartOpen?'open':''}" id="cart"></aside>
   </div>
   <button class="cartfab" id="cartfab" data-act="opencart"></button>`;
+  sb.from('cash_sessions').select('status').eq('branch_id', curBranch()).eq('business_date', manilaDate()).maybeSingle().then(({ data, error }) => {
+    const n = document.getElementById('drawerNote'); if (!n || error) return;
+    if (!data){ n.hidden = false; n.innerHTML = 'The cash drawer is not open yet today. <a href="#cash">Open it in Cash On Hand</a> before the first cash sale.'; }
+    else if (data.status === 'closed'){ n.hidden = false; n.textContent = 'Today’s cash drawer is already closed. New cash sales will not be in today’s count unless an admin reopens it.'; }
+  });
   document.getElementById('s_q').oninput = e => { S.q = e.target.value; renderProducts(); };
   renderProducts(); renderCart();
 }
@@ -1052,8 +1110,9 @@ async function saveProd(id, btn){
 }
 
 /* ===================== REPORTS (admin) ===================== */
-function rangeDates(){
-  const t = manilaDate(); const r = S.rep;
+function rangeDates(r = S.rep){
+  const t = manilaDate();
+  if (r.range==='lastmonth') { const last = addDays(t.slice(0,8)+'01', -1); return [last.slice(0,8)+'01', last]; }
   if (r.range==='today') return [t,t];
   if (r.range==='yesterday') { const y = addDays(t,-1); return [y,y]; }
   if (r.range==='7d') return [addDays(t,-6), t];
@@ -1063,7 +1122,7 @@ function rangeDates(){
 function viewReports(){
   const r = S.rep; const [f,t] = rangeDates();
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>Reports</h1><div class="sub" id="rp_sub">${esc(branchLabel())} · ${f===t ? fmtDay(f) : fmtDay(f)+' – '+fmtDay(t)}</div></div><span class="spacer"></span>
+    <div class="page-head"><div><h1>Sales Report</h1><div class="sub" id="rp_sub">${esc(branchLabel())} · ${f===t ? fmtDay(f) : fmtDay(f)+' – '+fmtDay(t)}</div></div><span class="spacer"></span>
       <button class="btn" data-act="csv">Export CSV</button></div>
     <div class="rangebar">${[['today','Today'],['yesterday','Yesterday'],['7d','Last 7 days'],['month','This month'],['custom','Custom']].map(([k,l]) => `<button class="chip ${r.range===k?'on':''}" data-act="range" data-v="${k}">${l}</button>`).join('')}
       ${r.range==='custom' ? `<input class="input" type="date" id="rp_from" value="${f}" style="max-width:160px"><span class="muted">to</span><input class="input" type="date" id="rp_to" value="${t}" style="max-width:160px">` : ''}</div>
@@ -1076,9 +1135,7 @@ function viewReports(){
 async function loadReport(){
   let [f,t] = rangeDates(); if (f > t) [f,t] = [t,f];
   try {
-    let qy = sb.from('sales').select('*, sale_items(*)').gte('created_at', dayStart(f).toISOString()).lt('created_at', dayStart(addDays(t,1)).toISOString()).order('created_at').limit(5000);
-    if (curBranch()) qy = qy.eq('branch_id', curBranch());
-    const sales = await q(qy);
+    const sales = await fetchAll(() => { let x = sb.from('sales').select('*, sale_items(*)').gte('created_at', dayStart(f).toISOString()).lt('created_at', dayStart(addDays(t,1)).toISOString()).order('created_at').order('id'); if (curBranch()) x = x.eq('branch_id', curBranch()); return x; });
     S.repData = { f, t, sales }; await refreshStock(); renderReport();
   } catch(e){ document.getElementById('rp').innerHTML = `<div class="empty">Could not load the report: ${esc(errMsg(e))}</div>`; }
 }
@@ -1164,12 +1221,13 @@ async function viewStaff(){
   S.profiles = await q(sb.from('profiles').select('*').order('full_name')).catch(() => S.profiles);
   const brOpts = sel => activeBranches().map(b => `<option value="${b.id}" ${sel===b.id?'selected':''}>${esc(b.name)}</option>`).join('');
   main().innerHTML = `<div class="page">
-    <div class="page-head"><div><h1>Staff accounts</h1><div class="sub">Sales Officers sell and see stock for their own branch only. Admins see every branch.</div></div>
+    <div class="page-head"><div><h1>Staff accounts</h1><div class="sub">Sales Officers sell and see stock for their own branch only. Admins see every branch. The daily rate is used by Payroll.</div></div>
       <span class="spacer"></span><button class="btn primary" data-act="newstaff">Add staff</button></div>
-    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Status</th><th></th></tr></thead><tbody>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th class="r">Daily rate (₱)</th><th>Status</th><th></th></tr></thead><tbody>
     ${S.profiles.map(p => { const self = p.id === S.me.id; return `<tr><td><b>${esc(p.full_name)}</b>${self?' <span class="muted">(you)</span>':''}</td><td class="num">@${esc(p.username)}</td>
       <td>${self ? '<span class="pill mute">Admin</span>' : `<select class="input" data-change="role" data-id="${p.id}" style="max-width:160px;min-height:34px;padding:4px 8px"><option value="sales" ${p.role==='sales'?'selected':''}>Sales Officer</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select>`}</td>
       <td>${p.role==='admin' ? '<span class="muted">All branches</span>' : `<select class="input" data-change="staffbranch" data-id="${p.id}" style="max-width:180px;min-height:34px;padding:4px 8px">${p.branch_id?'':'<option value="">Choose…</option>'}${brOpts(p.branch_id)}</select>`}</td>
+      <td class="r"><input class="input num" id="rate_${p.id}" data-change="rate" data-id="${p.id}" type="number" min="0" step="any" inputmode="decimal" value="${Number(p.daily_rate) || ''}" placeholder="0" aria-label="Daily rate for ${esc(p.full_name)}" style="max-width:110px;min-height:34px;padding:4px 8px;text-align:right"></td>
       <td>${p.active?'<span class="pill good">Active</span>':'<span class="pill bad">Deactivated</span>'}</td>
       <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="resetpw" data-id="${p.id}">Reset password</button>${self?'':` <button class="btn sm ${p.active?'danger':''}" data-act="toggleactive" data-id="${p.id}">${p.active?'Deactivate':'Activate'}</button>`}</td></tr>`; }).join('')}
     </tbody></table></div></div>
@@ -1241,12 +1299,496 @@ async function saveBranch(id, btn){
 
 /* ===================== MORE (mobile) ===================== */
 function viewMore(){
+  const rest = Object.keys(VIEWS).filter(v => canSee(v) && !VIEWS[v].mobileOnly && !S.mob.includes(v));
   main().innerHTML = `<div class="page">
     <div class="card card-b" style="display:flex;flex-direction:column;gap:2px"><span class="lbl">${isAdmin()?'Admin':'Sales Officer'}</span><b style="font-size:18px">${esc(S.me.full_name)}</b><span class="muted">@${esc(S.me.username)} · ${esc(isAdmin() ? branchLabel() : branchName(S.me.branch_id))}</span></div>
-    ${isAdmin() ? `<div class="card"><div class="list-m" style="display:flex">${['menu','staff','branches'].map(v => `<a class="li" href="#${v}" style="text-decoration:none;color:inherit"><span class="a">${VIEWS[v].label}</span><span class="c">›</span><span class="b">${{menu:'Prices, sizes and stock links',staff:'Accounts for sales officers',branches:'Add or edit branches'}[v]}</span></a>`).join('')}</div></div>` : ''}
+    ${rest.length ? `<div class="card"><div class="list-m" style="display:flex">${rest.map(v => `<a class="li" href="#${v}" style="text-decoration:none;color:inherit"><span class="a namecell"><span class="mi">${ICON[v]}</span>${esc(viewLabel(v))}</span><span class="c">›</span><span class="b">${esc(VIEWS[v].desc || '')}</span></a>`).join('')}</div></div>` : ''}
     <button class="btn danger" data-act="signout">Sign out</button>
   </div>`;
 }
+
+/* ===================== shared: periods & helpers ===================== */
+const RANGES = [['today','Today'],['yesterday','Yesterday'],['7d','Last 7 days'],['month','This month'],['lastmonth','Last month'],['custom','Custom']];
+const periodLabel = (f,t) => f===t ? fmtDay(f) : fmtDay(f)+' – '+fmtDay(t);
+function rangeBar(key){
+  const r = S[key]; const [f,t] = rangeDates(r);
+  return `<div class="rangebar">${RANGES.map(([k,l]) => `<button class="chip ${r.range===k?'on':''}" data-act="xrange" data-k="${key}" data-v="${k}">${l}</button>`).join('')}
+    ${r.range==='custom' ? `<input class="input" id="${key}_from" type="date" data-change="xfrom" data-k="${key}" value="${f}" style="max-width:160px"><span class="muted">to</span><input class="input" id="${key}_to" type="date" data-change="xto" data-k="${key}" value="${t}" style="max-width:160px">` : ''}</div>`;
+}
+async function fetchAll(make){
+  let out = [];
+  for (let i = 0; i < 50000; i += 1000){ const rows = await q(make().range(i, i+999)); out = out.concat(rows); if (rows.length < 1000) break; }
+  return out;
+}
+function armed(el){
+  if (el.dataset.armed) return true;
+  const t = el.textContent; el.dataset.armed = '1'; el.textContent = 'Tap again to confirm'; el.classList.add('danger');
+  setTimeout(() => { if (el.isConnected && el.dataset.armed){ delete el.dataset.armed; el.textContent = t; el.classList.remove('danger'); } }, 3500);
+  return false;
+}
+function pickBranchHTML(msg){
+  return `<div class="card card-b" style="display:flex;flex-direction:column;gap:12px"><div class="muted">${esc(msg)}</div>
+    <div class="pickbranch">${activeBranches().map(b => `<button data-act="setbranch" data-v="${b.id}"><b>${esc(b.name)}</b><span class="muted">${esc(b.address || b.code)}</span></button>`).join('')}</div></div>`;
+}
+const varLabel = v => Number(v) > 0 ? 'Over' : Number(v) < 0 ? 'Short' : 'Balanced';
+const varClass = v => Number(v) > 0 ? 'warn' : Number(v) < 0 ? 'bad' : 'good';
+const N0 = v => Number(v) || 0;
+
+/* ===================== CASH ON HAND ===================== */
+const DENOMS = [1000,500,200,100,50,20];
+async function viewCash(){
+  const today = manilaDate();
+  S.cashDate = !S.cashDate || S.cashDate > today ? today : S.cashDate;
+  main().innerHTML = `<div class="page">
+    <div class="page-head"><div><h1>Cash On Hand</h1><div class="sub">${esc(branchLabel())} · the cash drawer: starting cash, cash sales and every peso paid out.</div></div></div>
+    <div class="row">
+      <button class="btn sm" data-act="cday" data-d="-1" aria-label="Previous day">‹</button>
+      <input class="input" id="cash_date" type="date" style="max-width:170px" value="${S.cashDate}" max="${today}">
+      <button class="btn sm" data-act="cday" data-d="1" aria-label="Next day" ${S.cashDate>=today?'disabled':''}>›</button>
+      ${S.cashDate!==today ? '<button class="btn sm ghost" data-act="ctoday">Today</button>' : ''}
+    </div>
+    <div id="cashBody"><div class="card empty">Loading the drawer…</div></div></div>`;
+  document.getElementById('cash_date').onchange = e => { S.cashDate = e.target.value && e.target.value <= today ? e.target.value : today; viewCash(); };
+  const b = curBranch();
+  if (!b) return renderCashAll();
+  try {
+    const [sm, moves, exps] = await Promise.all([
+      q(sb.rpc('cash_summary', { p_branch:b, p_date:S.cashDate })),
+      q(sb.from('cash_moves').select('*').eq('branch_id', b).eq('move_date', S.cashDate).order('created_at')),
+      q(sb.from('expenses').select('*').eq('branch_id', b).eq('expense_date', S.cashDate).eq('paid_from','drawer').order('created_at'))
+    ]);
+    let pays = [], advs = [];
+    if (isAdmin()) [pays, advs] = await Promise.all([
+      q(sb.from('payroll_entries').select('*').eq('branch_id', b).eq('work_date', S.cashDate).eq('paid_from','drawer')),
+      q(sb.from('cash_advances').select('*').eq('branch_id', b).eq('advance_date', S.cashDate).eq('paid_from','drawer'))]);
+    S.cash = { sm, moves, exps, pays, advs };
+    renderCash();
+  } catch(e){ document.getElementById('cashBody').innerHTML = `<div class="card empty">Could not load the drawer: ${esc(errMsg(e))}</div>`; }
+}
+function renderCash(){
+  const { sm } = S.cash; const s = sm.session; const isToday = S.cashDate === manilaDate();
+  const canAct = isAdmin() || isToday; const closed = s && s.status === 'closed';
+  const status = !s ? ['Not opened','mute'] : closed ? ['Closed','mute'] : ['Open','good'];
+  const ledger = [['Starting cash', sm.opening, 1], ['Cash sales', sm.cash_sales, 1], ['Cash in', sm.cash_in, 1],
+    ['Expenses paid from drawer', sm.expenses, -1], ['Payroll paid from drawer', sm.payroll, -1], ['Cash advances', sm.advances, -1], ['Cash out', sm.cash_out, -1]];
+  const expected = closed ? N0(s.expected_cash) : N0(sm.expected);
+  let html = '';
+  if (!s) html += canAct ? `<div class="card"><div class="card-h"><h3>Open the drawer</h3></div><div class="card-b" style="display:flex;flex-direction:column;gap:12px;max-width:440px">
+      <div class="muted" style="font-size:14px">Count the cash in the drawer before the first sale.${N0(sm.suggested_opening) ? ` The last closing left <b>${peso(sm.suggested_opening)}</b> in the drawer.` : ''}</div>
+      <div class="field"><label for="op_cash">Starting cash (₱)</label><input class="input num" id="op_cash" type="number" inputmode="decimal" min="0" step="any" value="${N0(sm.suggested_opening) || ''}" placeholder="e.g. 1000"></div>
+      <button class="btn primary" data-act="opencash">Open drawer</button></div></div>`
+    : '<div class="card empty">The drawer was not opened on this day.</div>';
+  html += `<div class="cash-grid">
+    <div class="card"><div class="card-h"><h3>${closed ? 'Closing summary' : 'Expected cash on hand'}</h3><span class="spacer"></span><span class="pill ${status[1]}">${status[0]}</span></div>
+      <div class="card-b"><div class="ledger">
+        ${ledger.map(([l,v,sg]) => `<div class="lrow ${N0(v)?'':'zero'}"><span>${l}</span><span class="num">${sg<0?'−':'+'} ${peso(v)}</span></div>`).join('')}
+        <div class="lrow total"><span>Expected cash</span><span class="num">${peso(expected)}</span></div>
+        ${closed ? `<div class="lrow"><span>Counted cash</span><span class="num"><b>${peso(s.counted_cash)}</b></span></div>
+          <div class="lrow"><span>${varLabel(s.variance)}</span><span class="pill ${varClass(s.variance)} num">${Number(s.variance) ? peso(Math.abs(s.variance)) : 'Exact'}</span></div>
+          <div class="lrow"><span>Turned over to owner</span><span class="num">${peso(s.turnover)}</span></div>
+          <div class="lrow"><span>Left in drawer for the next day</span><span class="num"><b>${peso(s.carry_over)}</b></span></div>` : ''}
+      </div>
+      ${s ? `<div class="muted" style="font-size:13px;margin-top:10px">Opened ${fmtTime(s.opened_at)} by ${esc(nameOf(s.opened_by))}${s.closed_at ? ` · closed ${fmtTime(s.closed_at)} by ${esc(nameOf(s.closed_by))}` : ''}${s.close_note ? ` · “${esc(s.close_note)}”` : ''}</div>` : ''}</div>
+      ${s && !closed && canAct ? `<div class="card-f"><button class="btn" data-act="cashmove" data-v="in">+ Cash in</button><button class="btn" data-act="cashmove" data-v="out">− Cash out</button>
+        <button class="btn" data-act="quickexp">Record expense</button><span class="spacer"></span><button class="btn primary" data-act="closecash">Close drawer</button></div>` : ''}
+      ${closed && isAdmin() ? '<div class="card-f"><button class="btn" data-act="reopencash">Reopen drawer</button></div>' : ''}
+    </div>
+    <div class="card"><div class="card-h"><h3>Drawer activity</h3></div>${activityList()}</div>
+  </div>`;
+  document.getElementById('cashBody').innerHTML = html;
+}
+function activityList(){
+  const { moves, exps, pays, advs, sm } = S.cash; const closed = sm.session?.status === 'closed';
+  const rows = [
+    ...moves.map(m => ({ t:m.created_at, k:m.direction==='in' ? 'Cash in' : 'Cash out', d:m.reason + (m.note ? ' · ' + m.note : ''), a:(m.direction==='in'?1:-1)*N0(m.amount), by:m.created_by, del:isAdmin() && !closed ? m.id : null })),
+    ...exps.map(x => ({ t:x.created_at, k:'Expense', d:x.category + ' · ' + x.description, a:-N0(x.amount), by:x.created_by })),
+    ...pays.map(x => ({ t:x.created_at, k:'Payroll', d:nameOf(x.profile_id) + (Number(x.days)===0.5 ? ' · half day' : ''), a:-N0(x.net_pay), by:x.created_by })),
+    ...advs.map(x => ({ t:x.created_at, k:'Cash advance', d:nameOf(x.profile_id) + (x.note ? ' · ' + x.note : ''), a:-N0(x.amount), by:x.created_by }))
+  ].sort((a,b) => a.t < b.t ? 1 : -1);
+  if (!rows.length) return '<div class="empty">No cash in, cash out, expenses or payroll from the drawer yet. Cash sales are added automatically.</div>';
+  return `<div class="act">${rows.map(r => `<div class="arow"><div style="min-width:0"><b>${r.k}</b><div class="muted">${esc(r.d)}</div><div class="muted sm">${fmtTime(r.t)} · ${esc(nameOf(r.by))}</div></div>
+    <div class="r"><span class="num ${r.a<0?'neg':'pos'}">${r.a<0?'−':'+'} ${peso(Math.abs(r.a))}</span>${r.del ? `<button class="btn sm ghost" data-act="delmove" data-id="${r.del}">Delete</button>` : ''}</div></div>`).join('')}</div>`;
+}
+async function renderCashAll(){
+  const box = document.getElementById('cashBody'); const brs = activeBranches();
+  if (!brs.length){ box.innerHTML = '<div class="card empty">No branches yet. Add one under Branches.</div>'; return; }
+  try {
+    const sums = await Promise.all(brs.map(b => q(sb.rpc('cash_summary', { p_branch:b.id, p_date:S.cashDate }))));
+    const inDrawer = sums.reduce((a,s) => a + (s.session?.status==='closed' ? N0(s.session.carry_over) : N0(s.expected)), 0);
+    const paidOut = s => N0(s.expenses) + N0(s.payroll) + N0(s.advances) + N0(s.cash_out);
+    const closedN = sums.filter(s => s.session?.status==='closed').length;
+    box.innerHTML = `<div class="kpis k4">
+      <div class="kpi hero"><span class="k">Cash in drawers</span><span class="v num">${peso(inDrawer)}</span><span class="s">All branches · ${fmtDay(S.cashDate)}</span></div>
+      <div class="kpi"><span class="k">Cash sales</span><span class="v num">${peso(sums.reduce((a,s) => a + N0(s.cash_sales), 0))}</span></div>
+      <div class="kpi"><span class="k">Paid out</span><span class="v num">${peso(sums.reduce((a,s) => a + paidOut(s), 0))}</span><span class="s">Expenses, payroll, advances, cash out</span></div>
+      <div class="kpi"><span class="k">Turned over to owner</span><span class="v num">${peso(sums.reduce((a,s) => a + N0(s.session?.turnover), 0))}</span><span class="s">${closedN} of ${brs.length} drawers closed</span></div></div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Drawer</th><th class="r">Starting</th><th class="r">Cash sales</th><th class="r">Paid out</th><th class="r">Expected</th><th class="r">Counted</th><th>Over / short</th><th></th></tr></thead><tbody>
+    ${brs.map((b,i) => { const s = sums[i], se = s.session; const st = !se ? ['Not opened','mute'] : se.status==='open' ? ['Open','good'] : ['Closed','mute'];
+      return `<tr><td><b>${esc(b.name)}</b></td><td><span class="pill ${st[1]}">${st[0]}</span></td><td class="r num">${peso(s.opening)}</td><td class="r num">${peso(s.cash_sales)}</td>
+        <td class="r num">${peso(paidOut(s))}</td><td class="r num"><b>${peso(se?.status==='closed' ? se.expected_cash : s.expected)}</b></td>
+        <td class="r num">${se?.status==='closed' ? peso(se.counted_cash) : '—'}</td>
+        <td>${se?.status==='closed' ? `<span class="pill ${varClass(se.variance)}">${varLabel(se.variance)}${Number(se.variance) ? ' ' + peso(Math.abs(se.variance)) : ''}</span>` : ''}</td>
+        <td class="r"><button class="btn sm" data-act="setbranch" data-v="${b.id}">View</button></td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+  } catch(e){ box.innerHTML = `<div class="card empty">Could not load the drawers: ${esc(errMsg(e))}</div>`; }
+}
+function cashMoveModal(dir){
+  const reasons = dir === 'in' ? ['Change fund (barya)','Owner added cash','Other'] : ['Owner withdrawal','Bank deposit','Change fund returned','Other'];
+  openModal(`<div class="modal-h"><h2>${dir==='in' ? 'Cash in' : 'Cash out'}</h2></div><div class="modal-b">
+    <div class="muted" style="font-size:14px">${dir==='in' ? 'Cash added to the drawer that is not a sale.' : 'Cash taken out of the drawer that is not an expense or payroll.'}</div>
+    <div class="grid2"><div class="field"><label for="mv_reason">Reason</label><select class="input" id="mv_reason">${reasons.map(r => `<option>${r}</option>`).join('')}</select></div>
+      <div class="field"><label for="mv_amt">Amount (₱)</label><input class="input num" id="mv_amt" type="number" inputmode="decimal" min="0" step="any"></div></div>
+    <div class="field"><label for="mv_note">Note (optional)</label><input class="input" id="mv_note" placeholder="${dir==='in' ? 'e.g. ₱500 in coins from owner' : 'e.g. Deposited at BDO'}"></div>
+  </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="savemove" data-v="${dir}">Save</button></div>`);
+}
+async function saveMove(dir, btn){
+  const amt = Number(document.getElementById('mv_amt').value);
+  if (!(amt > 0)) return toast('Enter an amount more than ₱0.', true);
+  btn.disabled = true;
+  try { await q(sb.from('cash_moves').insert({ branch_id:curBranch(), move_date:S.cashDate, direction:dir, reason:document.getElementById('mv_reason').value, amount:amt, note:document.getElementById('mv_note').value.trim() || null, created_by:S.me.id }));
+    closeModal(); toast(dir === 'in' ? 'Cash in recorded.' : 'Cash out recorded.'); viewCash();
+  } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
+}
+function closeCashModal(){
+  const exp = N0(S.cash.sm.expected);
+  openModal(`<div class="modal-h"><h2>Close drawer</h2></div><div class="modal-b">
+    <div class="note">Count all the cash in the drawer. The POS expects <b class="num">${peso(exp)}</b>.</div>
+    <div class="lbl">Bills (number of pieces)</div>
+    <div class="denoms">${DENOMS.map(d => `<label class="denom"><span class="num"><b>₱${d.toLocaleString('en-PH')}</b></span><input class="input num" id="den_${d}" data-den="${d}" type="number" min="0" step="1" inputmode="numeric" placeholder="0"><span class="num muted" id="dv_${d}">₱0</span></label>`).join('')}</div>
+    <div class="field"><label for="den_coins">Coins, total (₱)</label><input class="input num" id="den_coins" data-den="coins" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div class="totals num"><div><span>Counted cash</span><b id="cl_count">₱0.00</b></div><div><span>Expected</span><span>${peso(exp)}</span></div></div>
+    <div class="change num" id="cl_var"></div>
+    <div class="grid2"><div class="field"><label for="cl_turn">Turn over to owner (₱)</label><input class="input num" id="cl_turn" data-den="turn" type="number" min="0" step="any" inputmode="decimal"></div>
+      <div class="field"><label>Left in drawer</label><div class="input num" id="cl_left" style="display:flex;align-items:center">₱0.00</div></div></div>
+    <div class="field"><label for="cl_note">Note (optional)</label><input class="input" id="cl_note" placeholder="e.g. Short ₱20, gave extra change"></div>
+  </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveclose">Close drawer</button></div>`);
+  S.clTurnDirty = false; updateClose();
+}
+function updateClose(){
+  let c = 0;
+  DENOMS.forEach(d => { const n = Math.max(0, Math.floor(N0(document.getElementById('den_'+d).value))); c += n*d; document.getElementById('dv_'+d).textContent = pesoShort(n*d); });
+  c = round2(c + Math.max(0, N0(document.getElementById('den_coins').value)));
+  const exp = N0(S.cash.sm.expected), v = round2(c - exp);
+  document.getElementById('cl_count').textContent = peso(c);
+  const el = document.getElementById('cl_var'); el.className = 'change num' + (v < 0 ? ' short' : v > 0 ? ' over' : '');
+  el.innerHTML = `<span>${v===0 ? 'Balanced' : v>0 ? 'Over by' : 'Short by'}</span><span>${peso(Math.abs(v))}</span>`;
+  const t = document.getElementById('cl_turn');
+  if (!S.clTurnDirty){ const open = N0(S.cash.sm.opening); t.value = c > open ? round2(c - open) : 0; }
+  document.getElementById('cl_left').textContent = peso(round2(c - N0(t.value)));
+  S.clCount = c;
+}
+async function saveClose(btn){
+  const turn = N0(document.getElementById('cl_turn').value);
+  if (turn < 0 || turn > S.clCount) return toast('Turnover must be between ₱0 and the cash counted.', true);
+  const den = {}; DENOMS.forEach(d => { const n = Math.floor(N0(document.getElementById('den_'+d).value)); if (n > 0) den[d] = n; });
+  const coins = N0(document.getElementById('den_coins').value); if (coins) den.coins = coins;
+  btn.disabled = true;
+  try { await q(sb.rpc('close_cash', { p_branch:curBranch(), p_date:S.cashDate, p_counted:S.clCount, p_denoms:den, p_turnover:turn, p_note:document.getElementById('cl_note').value }));
+    closeModal(); toast('Drawer closed.'); viewCash();
+  } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
+}
+
+/* ===================== EXPENSES ===================== */
+const EXP_CATS = ['Ingredients & food','Packaging & cups','Gas / LPG','Rent','Electricity & water','Transport & delivery','Repairs & maintenance','Cleaning supplies','Permits & fees','Marketing','Other'];
+async function viewExpenses(){
+  const [f,t] = rangeDates(S.exp);
+  main().innerHTML = `<div class="page">
+    <div class="page-head"><div><h1>Expenses</h1><div class="sub">${esc(branchLabel())} · ${periodLabel(f,t)}${isAdmin() ? '' : ' · you can record today’s expenses paid from the drawer'}</div></div><span class="spacer"></span>
+      <button class="btn primary" data-act="newexp">Add expense</button></div>
+    ${rangeBar('exp')}
+    <div id="expBody" style="display:flex;flex-direction:column;gap:14px"><div class="card empty">Loading expenses…</div></div></div>`;
+  if (S.openExpAdd){ S.openExpAdd = false; expModal(); }
+  try {
+    S.expRows = await fetchAll(() => { let x = sb.from('expenses').select('*').gte('expense_date', f).lte('expense_date', t).order('expense_date', { ascending:false }).order('id', { ascending:false }); if (curBranch()) x = x.eq('branch_id', curBranch()); return x; });
+    renderExpenses();
+  } catch(e){ document.getElementById('expBody').innerHTML = `<div class="card empty">Could not load expenses: ${esc(errMsg(e))}</div>`; }
+}
+function renderExpenses(){
+  const rows = S.expRows; const box = document.getElementById('expBody');
+  const tot = rows.reduce((a,x) => a + N0(x.amount), 0), drawer = rows.filter(x => x.paid_from==='drawer').reduce((a,x) => a + N0(x.amount), 0);
+  const byCat = sumBy(rows, x => x.category, x => N0(x.amount));
+  const all = !curBranch();
+  box.innerHTML = `<div class="kpis k4">
+      <div class="kpi hero"><span class="k">Total expenses</span><span class="v num">${peso(tot)}</span><span class="s">${rows.length} record${rows.length===1?'':'s'}</span></div>
+      <div class="kpi"><span class="k">From cash drawer</span><span class="v num">${peso(drawer)}</span></div>
+      <div class="kpi"><span class="k">Paid by owner</span><span class="v num">${peso(tot - drawer)}</span></div>
+      <div class="kpi"><span class="k">Biggest category</span><span class="v" style="font-size:18px">${byCat.size ? esc([...byCat].sort((a,b) => b[1]-a[1])[0][0]) : '—'}</span></div></div>
+    ${rows.length ? `<div class="two">
+      <div class="card"><div class="tbl-wrap resp"><table><thead><tr><th>Date</th>${all?'<th>Branch</th>':''}<th>Category</th><th>Description</th><th>Paid from</th><th class="r">Amount</th><th>Receipt</th>${isAdmin()?'<th></th>':''}</tr></thead><tbody>
+        ${rows.map(x => `<tr><td class="num" style="white-space:nowrap">${fmtDay(x.expense_date)}</td>${all?`<td>${esc(branchName(x.branch_id))}</td>`:''}<td>${esc(x.category)}</td>
+          <td>${esc(x.description)}<div class="muted" style="font-size:12px">${esc(nameOf(x.created_by))}</div></td><td>${x.paid_from==='drawer' ? 'Cash drawer' : 'Owner'}</td>
+          <td class="r num"><b>${peso(x.amount)}</b></td><td>${x.receipt_url ? `<a href="${esc(x.receipt_url)}" target="_blank" rel="noopener">${thumb(x.receipt_url)}</a>` : ''}</td>
+          ${isAdmin() ? `<td class="r"><button class="btn sm ghost" data-act="delexp" data-id="${x.id}">Delete</button></td>` : ''}</tr>`).join('')}
+      </tbody></table></div>
+      <div class="list-m">${rows.map(x => `<div class="li"><span class="a">${esc(x.description)}</span><span class="c num">${peso(x.amount)}</span>
+        <span class="b">${fmtDay(x.expense_date)} · ${esc(x.category)}${all ? ' · ' + esc(branchName(x.branch_id)) : ''}</span><span class="b" style="text-align:right">${x.paid_from==='drawer' ? 'Drawer' : 'Owner'}${isAdmin() ? ` <button class="btn sm ghost" data-act="delexp" data-id="${x.id}">Delete</button>` : ''}</span></div>`).join('')}</div></div>
+      <div class="card"><div class="card-h"><h3>By category</h3></div><div class="card-b">${barList(byCat)}</div></div></div>`
+    : '<div class="card empty">No expenses in this period. Tap Add expense to record one.</div>'}`;
+}
+function expModal(){
+  const today = manilaDate(); const b = curBranch(); setTimeout(() => { S.expDate = null; }, 0);
+  openModal(`<div class="modal-h"><h2>Add expense</h2></div><div class="modal-b">
+    ${isAdmin() && !b ? `<div class="field"><label for="ex_branch">Branch</label><select class="input" id="ex_branch">${activeBranches().map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>` : ''}
+    <div class="grid2"><div class="field"><label for="ex_cat">Category</label><select class="input" id="ex_cat">${EXP_CATS.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field"><label for="ex_amt">Amount (₱)</label><input class="input num" id="ex_amt" type="number" inputmode="decimal" min="0" step="any"></div></div>
+    <div class="field"><label for="ex_desc">What was it for?</label><input class="input" id="ex_desc" placeholder="e.g. 5 kg chicken thigh, 2 bags of ice"></div>
+    ${isAdmin() ? `<div class="grid2"><div class="field"><label for="ex_date">Date</label><input class="input" id="ex_date" type="date" max="${today}" value="${S.expDate || today}"></div>
+      <div class="field"><label for="ex_from">Paid from</label><select class="input" id="ex_from"><option value="drawer">Cash drawer</option><option value="owner">Owner (not from drawer)</option></select></div></div>`
+      : `<div class="muted" style="font-size:13px">Recorded for today at ${esc(branchName(S.me.branch_id))}, paid from the cash drawer.</div>`}
+    ${photoPicker(null, 'Receipt photo (optional)')}
+  </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveexp">Save expense</button></div>`);
+  bindPhotoPicker();
+}
+async function saveExp(btn){
+  const branch = isAdmin() ? (curBranch() || Number(document.getElementById('ex_branch')?.value)) : S.me.branch_id;
+  const amt = Number(document.getElementById('ex_amt').value); const desc = document.getElementById('ex_desc').value.trim();
+  if (!branch) return toast('Choose a branch.', true);
+  if (!(amt > 0)) return toast('Enter an amount more than ₱0.', true);
+  if (!desc) return toast('Say what the expense was for.', true);
+  btn.disabled = true;
+  try {
+    let receipt_url = null;
+    if (S.photo?.blob) receipt_url = await uploadPhoto('receipts', branch, S.photo.blob, false);
+    const row = { branch_id:branch, category:document.getElementById('ex_cat').value, description:desc, amount:amt, receipt_url, created_by:S.me.id,
+      expense_date: isAdmin() ? (document.getElementById('ex_date').value || manilaDate()) : manilaDate(),
+      paid_from: isAdmin() ? document.getElementById('ex_from').value : 'drawer' };
+    await q(sb.from('expenses').insert(row));
+    closeModal(); toast('Expense saved.'); route();
+  } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
+}
+
+/* ===================== PAYROLL (admin) ===================== */
+async function viewPayroll(){
+  S.payDate = S.payDate || manilaDate();
+  main().innerHTML = `<div class="page">
+    <div class="page-head"><div><h1>Payroll</h1><div class="sub">${esc(branchLabel())} · paid daily at each staff member’s daily rate. Overtime pays 125% of the hourly rate (daily rate ÷ 8).</div></div><span class="spacer"></span>
+      <button class="btn" data-act="newadv">Give cash advance</button></div>
+    <div class="row"><div class="seg tabs-seg">${[['daily','Daily pay'],['adv','Cash advances'],['hist','Pay history']].map(([k,l]) => `<button data-act="paytab" data-v="${k}" class="${S.payTab===k?'on':''}">${l}</button>`).join('')}</div></div>
+    <div id="payBody" style="display:flex;flex-direction:column;gap:14px"><div class="card empty">Loading payroll…</div></div></div>`;
+  try {
+    [S.profiles, S.advBal] = await Promise.all([ q(sb.from('profiles').select('*').order('full_name')), q(sb.rpc('advance_balances')) ]);
+    if (S.payTab === 'adv') await payAdv(); else if (S.payTab === 'hist') await payHist(); else await payDaily();
+  } catch(e){ document.getElementById('payBody').innerHTML = `<div class="card empty">Could not load payroll: ${esc(errMsg(e))}</div>`; }
+}
+const advBalOf = id => N0((S.advBal || []).find(r => r.profile_id === id)?.balance);
+const payStaffFor = b => S.profiles.filter(p => p.active && ((p.role === 'sales' && p.branch_id === b) || (p.role === 'admin' && N0(p.daily_rate) > 0)));
+const payFormOf = pid => (S.payForm[pid + '|' + S.payDate] ||= { days:1, ot:'', adv:'', oth:'', note:'', from:'drawer' });
+function payCalc(p, f){
+  const r = N0(p.daily_rate), basic = round2(r * f.days), ot = round2(r / 8 * 1.25 * N0(f.ot)), gross = round2(basic + ot);
+  return { basic, ot, gross, net: round2(gross - N0(f.adv) - N0(f.oth)) };
+}
+const payBreak = c => `Basic ${peso(c.basic)}${c.ot ? ` + overtime ${peso(c.ot)}` : ''} = ${peso(c.gross)}`;
+async function payDaily(){
+  const b = curBranch(); const box = document.getElementById('payBody'); const today = manilaDate();
+  if (!b){ box.innerHTML = pickBranchHTML('Staff are paid branch by branch. Pick the branch to pay.'); return; }
+  S.payForm = S.payForm || {};
+  S.payEnts = await q(sb.from('payroll_entries').select('*').eq('work_date', S.payDate));
+  const staff = payStaffFor(b); const here = S.payEnts.filter(e => e.branch_id === b);
+  const tot = here.reduce((a,e) => a + N0(e.net_pay), 0), drawer = here.filter(e => e.paid_from === 'drawer').reduce((a,e) => a + N0(e.net_pay), 0);
+  box.innerHTML = `<div class="row"><button class="btn sm" data-act="pday" data-d="-1" aria-label="Previous day">‹</button>
+      <input class="input" id="pay_date" type="date" max="${today}" value="${S.payDate}" style="max-width:170px">
+      <button class="btn sm" data-act="pday" data-d="1" aria-label="Next day" ${S.payDate>=today?'disabled':''}>›</button></div>
+    <div class="kpis k4"><div class="kpi hero"><span class="k">Paid · ${fmtDay(S.payDate)}</span><span class="v num">${peso(tot)}</span><span class="s">${here.length} of ${staff.length} staff</span></div>
+      <div class="kpi"><span class="k">From cash drawer</span><span class="v num">${peso(drawer)}</span></div>
+      <div class="kpi"><span class="k">Paid by owner</span><span class="v num">${peso(tot - drawer)}</span></div>
+      <div class="kpi"><span class="k">Advances still owed</span><span class="v num">${peso(staff.reduce((a,p) => a + advBalOf(p.id), 0))}</span><span class="s">by this branch’s staff</span></div></div>
+    ${staff.length ? `<div class="paygrid">${staff.map(p => payCard(p, S.payEnts.find(e => e.profile_id === p.id))).join('')}</div>`
+      : '<div class="card empty">No active staff at this branch. Assign Sales Officers to it on the Staff page.</div>'}`;
+  document.getElementById('pay_date').onchange = e => { S.payDate = e.target.value && e.target.value <= today ? e.target.value : today; viewPayroll(); };
+}
+function payCard(p, e){
+  const rate = N0(p.daily_rate), bal = advBalOf(p.id);
+  const head = `<div class="pc-h"><div style="min-width:0"><b>${esc(p.full_name)}</b><div class="muted" style="font-size:13px">${p.role==='admin' ? 'Admin' : 'Sales Officer'} · ${rate ? peso(rate, 0) + ' / day' : 'no daily rate'}</div></div><span class="spacer"></span>
+    ${e ? '<span class="pill good">Paid</span>' : ''}${bal > 0 ? `<span class="pill warn">Owes ${peso(bal, 0)}</span>` : ''}</div>`;
+  if (e) return `<div class="paycard">${head}<div class="pc-b"><div class="ledger">
+      <div class="lrow"><span>${Number(e.days)===1 ? 'Full day' : 'Half day'}${N0(e.ot_hours) ? ` + ${qtyFmt(e.ot_hours)} hr overtime` : ''}</span><span class="num">${peso(e.gross_pay)}</span></div>
+      ${N0(e.advance_deduct) ? `<div class="lrow"><span>Cash advance deducted</span><span class="num">− ${peso(e.advance_deduct)}</span></div>` : ''}
+      ${N0(e.other_deduct) ? `<div class="lrow"><span>${esc(e.other_note || 'Other deduction')}</span><span class="num">− ${peso(e.other_deduct)}</span></div>` : ''}</div>
+      <div class="netline"><span>Net paid</span><span class="num">${peso(e.net_pay)}</span></div>
+      <div class="muted" style="font-size:13px">${e.paid_from==='drawer' ? 'From cash drawer' : 'Paid by owner'}${e.branch_id !== curBranch() ? ` · at ${esc(branchName(e.branch_id))}` : ''} · ${fmtTime(e.created_at)}</div></div>
+    <div class="pc-f"><button class="btn sm ghost" data-act="undopay" data-id="${e.id}">Undo payment</button></div></div>`;
+  if (!rate) return `<div class="paycard">${head}<div class="pc-b"><div class="muted">Set a daily rate before paying.</div></div><div class="pc-f"><button class="btn sm" data-act="gostaff">Set daily rate</button></div></div>`;
+  const f = payFormOf(p.id), c = payCalc(p, f), k = p.id;
+  return `<div class="paycard" data-card="${k}">${head}<div class="pc-b">
+    <div class="seg">${[[1,'Full day'],[0.5,'Half day'],[0,'Absent']].map(([v,l]) => `<button data-act="payatt" data-pid="${k}" data-v="${v}" class="${f.days===v ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${f.days ? `<div class="grid2">
+      <div class="field"><label for="ot_${k}">Overtime (hours)</label><input class="input num" id="ot_${k}" data-pf="ot" data-pid="${k}" type="number" min="0" step="0.5" inputmode="decimal" value="${esc(f.ot)}" placeholder="0"></div>
+      <div class="field"><label for="fr_${k}">Paid from</label><select class="input" id="fr_${k}" data-pf="from" data-pid="${k}"><option value="drawer" ${f.from==='drawer'?'selected':''}>Cash drawer</option><option value="owner" ${f.from==='owner'?'selected':''}>Owner</option></select></div>
+      <div class="field"><label for="ad_${k}">Deduct advance</label><input class="input num" id="ad_${k}" data-pf="adv" data-pid="${k}" type="number" min="0" step="any" inputmode="decimal" value="${esc(f.adv)}" placeholder="${bal ? 'max ' + peso(bal, 0) : 'none owed'}" ${bal ? '' : 'disabled'}></div>
+      <div class="field"><label for="od_${k}">Other deduction</label><input class="input num" id="od_${k}" data-pf="oth" data-pid="${k}" type="number" min="0" step="any" inputmode="decimal" value="${esc(f.oth)}" placeholder="0"></div></div>
+    <input class="input" id="on_${k}" data-pf="note" data-pid="${k}" value="${esc(f.note)}" placeholder="Reason for other deduction (optional)">
+    <div class="netline"><span>Net pay</span><span class="num" id="net_${k}">${peso(c.net)}</span></div>
+    <div class="muted num" style="font-size:13px" id="brk_${k}">${payBreak(c)}</div>` : '<div class="muted">Absent. Nothing is paid or recorded.</div>'}
+  </div>${f.days ? `<div class="pc-f"><button class="btn primary" data-act="paynow" data-pid="${k}" id="pb_${k}" ${c.net < 0 ? 'disabled' : ''}>Pay ${peso(c.net)}</button></div>` : ''}</div>`;
+}
+function rerenderPayCard(pid){
+  const p = S.profiles.find(x => x.id === pid); const el = document.querySelector(`[data-card="${pid}"]`);
+  if (p && el) el.outerHTML = payCard(p, null);
+}
+function payInput(el){
+  const pid = el.dataset.pid; const p = S.profiles.find(x => x.id === pid); if (!p) return;
+  const f = payFormOf(pid); f[el.dataset.pf] = el.value;
+  const c = payCalc(p, f);
+  document.getElementById('net_' + pid).textContent = peso(c.net);
+  document.getElementById('brk_' + pid).textContent = payBreak(c);
+  const btn = document.getElementById('pb_' + pid); btn.textContent = c.net < 0 ? 'Deductions are more than the pay' : `Pay ${peso(c.net)}`; btn.disabled = c.net < 0;
+}
+async function payNow(pid, btn){
+  const p = S.profiles.find(x => x.id === pid); const f = payFormOf(pid); const c = payCalc(p, f); const bal = advBalOf(pid);
+  if (N0(f.adv) > bal) return toast(`${p.full_name} only owes ${peso(bal)} in cash advances.`, true);
+  if (c.net < 0) return toast('Deductions are more than the pay for the day.', true);
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try { await q(sb.rpc('pay_staff', { p_branch:curBranch(), p_profile:pid, p_date:S.payDate, p_days:f.days, p_ot_hours:N0(f.ot), p_advance_deduct:N0(f.adv), p_other_deduct:N0(f.oth), p_other_note:f.note || null, p_paid_from:f.from }));
+    delete S.payForm[pid + '|' + S.payDate]; toast(`Paid ${p.full_name} ${peso(c.net)}.`); viewPayroll();
+  } catch(e){ btn.disabled = false; btn.textContent = `Pay ${peso(c.net)}`; toast(errMsg(e), true); }
+}
+async function payAdv(){
+  const box = document.getElementById('payBody'); const b = curBranch();
+  const advs = await q((b ? sb.from('cash_advances').select('*').eq('branch_id', b) : sb.from('cash_advances').select('*')).order('advance_date', { ascending:false }).order('id', { ascending:false }).limit(300));
+  const balRow = id => (S.advBal || []).find(r => r.profile_id === id) || { given:0, deducted:0, balance:0 };
+  const people = S.profiles.filter(p => N0(balRow(p.id).given) > 0 || (p.active && (p.role === 'admin' ? N0(p.daily_rate) > 0 : (!b || p.branch_id === b))));
+  const owed = people.reduce((a,p) => a + N0(balRow(p.id).balance), 0);
+  box.innerHTML = `<div class="kpis k4"><div class="kpi hero"><span class="k">Advances still owed</span><span class="v num">${peso(owed)}</span><span class="s">${people.filter(p => N0(balRow(p.id).balance) > 0).length} staff owe money</span></div></div>
+    <div class="two"><div class="card"><div class="card-h"><h3>Balances</h3></div>
+      ${people.length ? `<div class="tbl-wrap"><table><thead><tr><th>Staff</th><th class="r">Given</th><th class="r">Deducted from pay</th><th class="r">Still owes</th></tr></thead><tbody>
+        ${people.map(p => { const r = balRow(p.id); return `<tr><td><b>${esc(p.full_name)}</b>${p.active ? '' : ' <span class="pill mute">Inactive</span>'}</td><td class="r num">${peso(r.given)}</td><td class="r num">${peso(r.deducted)}</td><td class="r num"><b>${peso(r.balance)}</b></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">No staff yet.</div>'}</div>
+    <div class="card"><div class="card-h"><h3>Advances given</h3></div>
+      ${advs.length ? `<div class="act">${advs.map(a => `<div class="arow"><div style="min-width:0"><b>${esc(nameOf(a.profile_id))}</b><div class="muted">${fmtDay(a.advance_date)} · ${a.paid_from==='drawer' ? 'from cash drawer' : 'paid by owner'}${b ? '' : ' · ' + esc(branchName(a.branch_id))}</div>${a.note ? `<div class="muted sm">${esc(a.note)}</div>` : ''}</div>
+        <div class="r"><span class="num"><b>${peso(a.amount)}</b></span><button class="btn sm ghost" data-act="deladv" data-id="${a.id}">Delete</button></div></div>`).join('')}</div>`
+        : '<div class="empty">No cash advances yet. Use Give cash advance at the top.</div>'}</div></div>`;
+}
+function advModal(){
+  const today = manilaDate(); const b = curBranch();
+  const staff = S.profiles.filter(p => p.active && (p.role === 'admin' || !b || p.branch_id === b));
+  if (!staff.length) return toast('No active staff to give an advance to.', true);
+  openModal(`<div class="modal-h"><h2>Give cash advance</h2></div><div class="modal-b">
+    <div class="field"><label for="av_staff">Staff</label><select class="input" id="av_staff">${staff.map(p => `<option value="${p.id}">${esc(p.full_name)}${advBalOf(p.id) ? ` (owes ${peso(advBalOf(p.id), 0)})` : ''}</option>`).join('')}</select></div>
+    ${b ? '' : `<div class="field"><label for="av_branch">Branch the cash comes from</label><select class="input" id="av_branch">${activeBranches().map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>`}
+    <div class="grid2"><div class="field"><label for="av_amt">Amount (₱)</label><input class="input num" id="av_amt" type="number" inputmode="decimal" min="0" step="any"></div>
+      <div class="field"><label for="av_date">Date</label><input class="input" id="av_date" type="date" max="${today}" value="${today}"></div></div>
+    <div class="grid2"><div class="field"><label for="av_from">Paid from</label><select class="input" id="av_from"><option value="drawer">Cash drawer</option><option value="owner">Owner</option></select></div>
+      <div class="field"><label for="av_note">Note (optional)</label><input class="input" id="av_note" placeholder="e.g. Tuition, emergency"></div></div>
+    <div class="muted" style="font-size:13px">Deduct it later from their daily pay. It is not counted as an expense.</div>
+  </div><div class="modal-f"><button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="saveadv">Give advance</button></div>`);
+}
+async function saveAdv(btn){
+  const pid = document.getElementById('av_staff').value; const amt = Number(document.getElementById('av_amt').value);
+  const p = S.profiles.find(x => x.id === pid);
+  const branch = curBranch() || Number(document.getElementById('av_branch')?.value) || p?.branch_id;
+  if (!(amt > 0)) return toast('Enter an amount more than ₱0.', true);
+  if (!branch) return toast('Choose the branch the cash comes from.', true);
+  btn.disabled = true;
+  try { await q(sb.from('cash_advances').insert({ branch_id:branch, profile_id:pid, advance_date:document.getElementById('av_date').value || manilaDate(), amount:amt, paid_from:document.getElementById('av_from').value, note:document.getElementById('av_note').value.trim() || null, created_by:S.me.id }));
+    closeModal(); toast(`Cash advance of ${peso(amt)} recorded for ${p.full_name}.`); viewPayroll();
+  } catch(e){ btn.disabled = false; toast(errMsg(e), true); }
+}
+async function payHist(){
+  const box = document.getElementById('payBody'); const [f,t] = rangeDates(S.payh); const b = curBranch();
+  const ents = await fetchAll(() => { let x = sb.from('payroll_entries').select('*').gte('work_date', f).lte('work_date', t).order('work_date', { ascending:false }).order('id'); if (b) x = x.eq('branch_id', b); return x; });
+  const per = new Map(); ents.forEach(e => { const o = per.get(e.profile_id) || { days:0, ot:0, gross:0, adv:0, oth:0, net:0 };
+    o.days += N0(e.days); o.ot += N0(e.ot_hours); o.gross += N0(e.gross_pay); o.adv += N0(e.advance_deduct); o.oth += N0(e.other_deduct); o.net += N0(e.net_pay); per.set(e.profile_id, o); });
+  const tot = [...per.values()].reduce((a,o) => ({ gross:a.gross + o.gross, net:a.net + o.net, days:a.days + o.days }), { gross:0, net:0, days:0 });
+  box.innerHTML = `${rangeBar('payh')}
+    <div class="kpis k4"><div class="kpi hero"><span class="k">Net pay · ${periodLabel(f,t)}</span><span class="v num">${peso(tot.net)}</span><span class="s">Gross ${peso(tot.gross)}</span></div>
+      <div class="kpi"><span class="k">Days paid</span><span class="v num">${qtyFmt(tot.days)}</span></div>
+      <div class="kpi"><span class="k">Staff paid</span><span class="v num">${per.size}</span></div></div>
+    ${ents.length ? `<div class="card"><div class="card-h"><h3>By staff</h3></div><div class="tbl-wrap"><table><thead><tr><th>Staff</th><th class="r">Days</th><th class="r">OT hrs</th><th class="r">Gross</th><th class="r">Advances deducted</th><th class="r">Other deductions</th><th class="r">Net paid</th></tr></thead><tbody>
+        ${[...per].sort((a,b) => b[1].net - a[1].net).map(([id,o]) => `<tr><td><b>${esc(nameOf(id))}</b></td><td class="r num">${qtyFmt(o.days)}</td><td class="r num">${qtyFmt(o.ot)}</td><td class="r num">${peso(o.gross)}</td><td class="r num">${peso(o.adv)}</td><td class="r num">${peso(o.oth)}</td><td class="r num"><b>${peso(o.net)}</b></td></tr>`).join('')}
+      </tbody></table></div></div>
+      <div class="card"><div class="card-h"><h3>Every payment</h3></div><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Staff</th>${b ? '' : '<th>Branch</th>'}<th>Day</th><th class="r">Gross</th><th class="r">Deductions</th><th class="r">Net</th><th>Paid from</th></tr></thead><tbody>
+        ${ents.map(e => `<tr><td class="num" style="white-space:nowrap">${fmtDay(e.work_date)}</td><td>${esc(nameOf(e.profile_id))}</td>${b ? '' : `<td>${esc(branchName(e.branch_id))}</td>`}
+          <td>${Number(e.days)===1 ? 'Full' : 'Half'}${N0(e.ot_hours) ? ` + ${qtyFmt(e.ot_hours)}h OT` : ''}</td><td class="r num">${peso(e.gross_pay)}</td><td class="r num">${N0(e.advance_deduct) + N0(e.other_deduct) ? '− ' + peso(N0(e.advance_deduct) + N0(e.other_deduct)) : '—'}</td>
+          <td class="r num"><b>${peso(e.net_pay)}</b></td><td>${e.paid_from==='drawer' ? 'Drawer' : 'Owner'}</td></tr>`).join('')}
+      </tbody></table></div></div>` : '<div class="card empty">No pay recorded in this period.</div>'}`;
+}
+
+/* ===================== PROFIT REPORT (admin) ===================== */
+async function viewProfit(){
+  const [f,t] = rangeDates(S.pr); const b = curBranch();
+  main().innerHTML = `<div class="page">
+    <div class="page-head"><div><h1>Profit Report</h1><div class="sub">${esc(branchLabel())} · ${periodLabel(f,t)} · sales minus expenses and payroll</div></div><span class="spacer"></span>
+      <button class="btn" data-act="profitcsv">Export CSV</button></div>
+    ${rangeBar('pr')}
+    <div id="prBody" style="display:flex;flex-direction:column;gap:14px"><div class="card empty">Adding it all up…</div></div></div>`;
+  try {
+    const scope = x => b ? x.eq('branch_id', b) : x;
+    const [sales, exps, pays] = await Promise.all([
+      fetchAll(() => scope(sb.from('sales').select('id,created_at,total,branch_id').eq('status','completed').gte('created_at', dayStart(f).toISOString()).lt('created_at', dayStart(addDays(t,1)).toISOString()).order('created_at').order('id'))),
+      fetchAll(() => scope(sb.from('expenses').select('id,expense_date,category,amount,branch_id').gte('expense_date', f).lte('expense_date', t).order('id'))),
+      fetchAll(() => scope(sb.from('payroll_entries').select('id,work_date,net_pay,advance_deduct,branch_id').gte('work_date', f).lte('work_date', t).order('id')))
+    ]);
+    S.prData = { f, t, sales, exps, pays }; renderProfit();
+  } catch(e){ document.getElementById('prBody').innerHTML = `<div class="card empty">Could not load the report: ${esc(errMsg(e))}</div>`; }
+}
+const payCost = x => N0(x.net_pay) + N0(x.advance_deduct);
+function signedChart(labels, values){
+  const W = 640, H = 230, padL = 52, padB = 26, padT = 14, n = labels.length;
+  const mx = Math.max(0, ...values), mn = Math.min(0, ...values); const raw = ((mx - mn) || 1) / 4;
+  const p10 = Math.pow(10, Math.floor(Math.log10(raw))); const step = [1,2,2.5,5,10].find(x => x*p10 >= raw) * p10;
+  const top = Math.ceil(mx / step) * step || step, bot = Math.floor(mn / step) * step; const span = top - bot;
+  const y = v => padT + (H - padT - padB) * (top - v) / span; const bw = (W - padL - 8) / n;
+  const kf = v => Math.abs(v) >= 1000 ? (v/1000).toLocaleString('en-PH', { maximumFractionDigits:1 }) + 'k' : String(Math.round(v));
+  let g = '';
+  for (let i = 0; i <= Math.round(span / step); i++){ const v = bot + i*step;
+    g += `<line x1="${padL}" x2="${W-4}" y1="${y(v)}" y2="${y(v)}" stroke="${Math.abs(v) < 1e-9 ? 'var(--ink)' : 'var(--line)'}" stroke-width="1"/><text x="${padL-6}" y="${y(v)+4}" text-anchor="end">${kf(v)}</text>`; }
+  const every = Math.ceil(n / 12);
+  values.forEach((v,i) => { const x = padL + i*bw + bw*.16, w = Math.max(1, bw*.68), y0 = y(Math.max(v,0)), h = Math.abs(y(v) - y(0));
+    g += `<rect x="${x}" y="${y0}" width="${w}" height="${v ? Math.max(h, 1) : 0}" fill="${v < 0 ? 'var(--chili)' : 'var(--ink)'}"><title>${labels[i]}: ${v < 0 ? 'loss ' : 'profit '}${peso(Math.abs(v))}</title></rect>`;
+    if (i % every === 0) g += `<text x="${x + w/2}" y="${H-8}" text-anchor="middle">${labels[i]}</text>`; });
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Net profit by period">${g}</svg></div>`;
+}
+function renderProfit(){
+  const { f, t, sales, exps, pays } = S.prData;
+  const salesT = sales.reduce((a,x) => a + N0(x.total), 0), expT = exps.reduce((a,x) => a + N0(x.amount), 0), payT = pays.reduce((a,x) => a + payCost(x), 0);
+  const profit = round2(salesT - expT - payT), margin = salesT ? profit / salesT * 100 : 0;
+  const byCat = [...sumBy(exps, x => x.category, x => N0(x.amount))].sort((a,b) => b[1] - a[1]);
+  const days = []; for (let d = f, g = 0; d <= t && g < 800; d = addDays(d,1), g++) days.push(d);
+  const monthly = days.length > 62; const keyOf = ds => monthly ? ds.slice(0,7) : ds;
+  const keys = [...new Set(days.map(keyOf))]; const val = new Map(keys.map(k => [k, { s:0, e:0, p:0 }]));
+  sales.forEach(x => { const o = val.get(keyOf(manilaDate(new Date(x.created_at)))); if (o) o.s += N0(x.total); });
+  exps.forEach(x => { const o = val.get(keyOf(x.expense_date)); if (o) o.e += N0(x.amount); });
+  pays.forEach(x => { const o = val.get(keyOf(x.work_date)); if (o) o.p += payCost(x); });
+  const labels = keys.map(k => monthly ? new Date(k + '-15T12:00:00+08:00').toLocaleDateString('en-PH', { timeZone:TZ, month:'short', year:'2-digit' }) : dayStart(k).toLocaleDateString('en-PH', { timeZone:TZ, month:'short', day:'numeric' }));
+  S.prData.rows = keys.map((k,i) => { const o = val.get(k); return { label: monthly ? labels[i] : k, ...o, profit: round2(o.s - o.e - o.p) }; });
+  const brRows = curBranch() ? [] : S.branches.map(b => { const s = sales.filter(x => x.branch_id === b.id).reduce((a,x) => a + N0(x.total), 0), e = exps.filter(x => x.branch_id === b.id).reduce((a,x) => a + N0(x.amount), 0), p = pays.filter(x => x.branch_id === b.id).reduce((a,x) => a + payCost(x), 0);
+    return { b, s, e, p, pr: round2(s - e - p) }; }).filter(r => r.s || r.e || r.p);
+  const best = S.prData.rows.filter(r => r.s || r.e || r.p).sort((a,b) => b.profit - a.profit)[0];
+  document.getElementById('prBody').innerHTML = `
+    <div class="kpis">
+      <div class="kpi hero"><span class="k">${profit < 0 ? 'Net loss' : 'Net profit'}</span><span class="v num">${profit < 0 ? '−' : ''}${peso(Math.abs(profit))}</span><span class="s">${periodLabel(f,t)}</span></div>
+      <div class="kpi"><span class="k">Sales</span><span class="v num">${peso(salesT)}</span><span class="s">${sales.length} orders</span></div>
+      <div class="kpi"><span class="k">Expenses</span><span class="v num">${peso(expT)}</span><span class="s">${exps.length} records</span></div>
+      <div class="kpi"><span class="k">Payroll</span><span class="v num">${peso(payT)}</span><span class="s">${pays.length} paid days</span></div>
+      <div class="kpi"><span class="k">Profit margin</span><span class="v num ${profit < 0 ? 'neg' : ''}">${salesT ? margin.toFixed(1) + '%' : '—'}</span><span class="s">${profit < 0 ? 'Costs are higher than sales' : `Of every ₱100 sold, ₱${margin.toFixed(0)} is profit`}</span></div></div>
+    <div class="two">
+      <div class="card"><div class="card-h"><h3>Profit &amp; loss</h3></div><div class="card-b"><div class="ledger pl">
+        <div class="lrow strong"><span>Sales <span class="muted">(after discounts, voids removed)</span></span><span class="num">${peso(salesT)}</span></div>
+        <div class="lrow head"><span>Expenses</span><span></span></div>
+        ${byCat.map(([c,v]) => `<div class="lrow sub"><span>${esc(c)}</span><span class="num">− ${peso(v)}</span></div>`).join('') || '<div class="lrow sub zero"><span>No expenses recorded</span><span class="num">− ₱0.00</span></div>'}
+        <div class="lrow"><span>Total expenses</span><span class="num">− ${peso(expT)}</span></div>
+        <div class="lrow"><span>Payroll</span><span class="num">− ${peso(payT)}</span></div>
+        <div class="lrow total ${profit < 0 ? 'neg' : ''}"><span>${profit < 0 ? 'Net loss' : 'Net profit'}</span><span class="num">${profit < 0 ? '−' : ''}${peso(Math.abs(profit))}</span></div></div>
+        <div class="muted" style="font-size:12px;margin-top:12px">Payroll is the pay earned for each day worked, including any part kept back to repay a cash advance. A cash advance on its own is a loan, so it is not an expense.</div></div></div>
+      <div class="card"><div class="card-h"><h3>${monthly ? 'Profit by month' : 'Profit by day'}</h3><span class="spacer"></span><span class="muted" style="font-size:13px">Red is a loss</span></div>
+        <div class="card-b">${keys.length > 1 && (salesT || expT || payT) ? signedChart(labels, S.prData.rows.map(r => r.profit)) : `<div class="empty">${keys.length > 1 ? 'Nothing recorded in this period yet.' : 'Pick a longer period to see profit over time.'}</div>`}
+        ${best && keys.length > 1 ? `<div class="muted" style="font-size:13px;margin-top:8px">Best ${monthly ? 'month' : 'day'}: <b style="color:var(--ink)">${monthly ? esc(best.label) : fmtDay(best.label)}</b> with ${peso(best.profit)} profit.</div>` : ''}</div></div>
+    </div>
+    ${brRows.length > 1 ? `<div class="card"><div class="card-h"><h3>By branch</h3></div><div class="tbl-wrap"><table><thead><tr><th>Branch</th><th class="r">Sales</th><th class="r">Expenses</th><th class="r">Payroll</th><th class="r">Profit</th><th class="r">Margin</th></tr></thead><tbody>
+      ${brRows.sort((a,b) => b.pr - a.pr).map(r => `<tr><td><b>${esc(r.b.name)}</b></td><td class="r num">${peso(r.s)}</td><td class="r num">${peso(r.e)}</td><td class="r num">${peso(r.p)}</td>
+        <td class="r num ${r.pr < 0 ? 'neg' : ''}"><b>${r.pr < 0 ? '−' : ''}${peso(Math.abs(r.pr))}</b></td><td class="r num">${r.s ? (r.pr / r.s * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('')}
+    </tbody></table></div></div>` : ''}`;
+}
+function profitCSV(){
+  const d = S.prData; if (!d?.rows) return;
+  const rows = [['Period','Sales','Expenses','Payroll','Net profit']].concat(d.rows.map(r => [r.label, r.s.toFixed(2), r.e.toFixed(2), r.p.toFixed(2), r.profit.toFixed(2)]));
+  const T = d.rows.reduce((a,r) => ({ s:a.s + r.s, e:a.e + r.e, p:a.p + r.p }), { s:0, e:0, p:0 });
+  rows.push(['TOTAL', T.s.toFixed(2), T.e.toFixed(2), T.p.toFixed(2), (T.s - T.e - T.p).toFixed(2)]);
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' }));
+  a.download = `indiana-spice-profit_${curBranch() ? branchById(curBranch()).code.toLowerCase() : 'all'}_${d.f}_to_${d.t}.csv`; document.body.appendChild(a); a.click(); a.remove();
+}
+
 
 /* ===================== modal ===================== */
 function openModal(html, wide){
@@ -1309,6 +1851,33 @@ document.addEventListener('click', async e => {
     case 'addrec': syncDraft(); if (!S.items.length) return toast('Add a stock item first in Inventory.', true); S.draft.variants[el.dataset.vi].recipe.push({ item_id:S.items[0].id, qty:1 }); return renderVariants();
     case 'rmrec': { syncDraft(); const [vi,ri] = el.dataset.ri.split('.'); S.draft.variants[vi].recipe.splice(ri,1); return renderVariants(); }
     case 'saveprod': return saveProd(id, el);
+    case 'xrange': { const k = el.dataset.k; if (el.dataset.v === 'custom' && !S[k].from){ const [f,t] = rangeDates(S[k]); S[k].from = f; S[k].to = t; } S[k].range = el.dataset.v; return route(); }
+    case 'cday': { const d = addDays(S.cashDate, Number(el.dataset.d)); S.cashDate = d > manilaDate() ? manilaDate() : d; return viewCash(); }
+    case 'ctoday': S.cashDate = manilaDate(); return viewCash();
+    case 'opencash': { const v = document.getElementById('op_cash').value; if (v === '' || Number(v) < 0) return toast('Enter the starting cash (₱0 or more).', true); el.disabled = true;
+      try { await q(sb.rpc('open_cash', { p_branch:curBranch(), p_date:S.cashDate, p_opening:Number(v) })); toast('Drawer opened.'); viewCash(); } catch(err){ el.disabled = false; toast(errMsg(err), true); } return; }
+    case 'cashmove': return cashMoveModal(el.dataset.v);
+    case 'savemove': return saveMove(el.dataset.v, el);
+    case 'closecash': return closeCashModal();
+    case 'saveclose': return saveClose(el);
+    case 'reopencash': if (!armed(el)) return; try { await q(sb.rpc('reopen_cash', { p_branch:curBranch(), p_date:S.cashDate })); toast('Drawer reopened.'); viewCash(); } catch(err){ toast(errMsg(err), true); } return;
+    case 'delmove': if (!armed(el)) return; try { await q(sb.from('cash_moves').delete().eq('id', id)); toast('Deleted.'); viewCash(); } catch(err){ toast(errMsg(err), true); } return;
+    case 'quickexp': S.openExpAdd = true; S.expDate = S.cashDate; location.hash = 'expenses'; if (S.view === 'expenses') viewExpenses(); return;
+    case 'newexp': if (isAdmin() && !activeBranches().length) return toast('Add a branch first under Branches.', true); return expModal();
+    case 'saveexp': return saveExp(el);
+    case 'delexp': if (!armed(el)) return; try { await q(sb.from('expenses').delete().eq('id', id)); toast('Expense deleted.'); viewExpenses(); } catch(err){ toast(errMsg(err), true); } return;
+    case 'paytab': S.payTab = el.dataset.v; return viewPayroll();
+    case 'pday': { const d = addDays(S.payDate, Number(el.dataset.d)); S.payDate = d > manilaDate() ? manilaDate() : d; return viewPayroll(); }
+    case 'payatt': payFormOf(el.dataset.pid).days = Number(el.dataset.v); return rerenderPayCard(el.dataset.pid);
+    case 'paynow': return payNow(el.dataset.pid, el);
+    case 'undopay': if (!armed(el)) return; try { await q(sb.from('payroll_entries').delete().eq('id', id)); toast('Payment undone.'); viewPayroll(); } catch(err){ toast(errMsg(err), true); } return;
+    case 'newadv': return advModal();
+    case 'saveadv': return saveAdv(el);
+    case 'deladv': { if (!armed(el)) return; const a = await q(sb.from('cash_advances').select('*').eq('id', id).maybeSingle()).catch(() => null);
+      if (a && advBalOf(a.profile_id) - Number(a.amount) < 0) return toast('Part of this advance was already deducted from pay. Undo those payments first.', true);
+      try { await q(sb.from('cash_advances').delete().eq('id', id)); toast('Advance deleted.'); viewPayroll(); } catch(err){ toast(errMsg(err), true); } return; }
+    case 'gostaff': location.hash = 'staff'; return;
+    case 'profitcsv': return profitCSV();
     case 'setbranch': return setBranch(el.dataset.v);
     case 'editbranch': return branchModal(id || null);
     case 'savebranch': return saveBranch(id, el);
@@ -1328,12 +1897,21 @@ document.addEventListener('change', async e => {
   const el = e.target.closest('[data-change]'); if (!el) return;
   const k = el.dataset.change;
   if (k === 'branch') return setBranch(el.value);
+  if (k === 'xfrom' || k === 'xto'){ const st = S[el.dataset.k]; st[k === 'xfrom' ? 'from' : 'to'] = el.value; if (st.from && st.to) route(); return; }
+  if (k === 'rate'){ const v = Number(el.value); if (el.value !== '' && !(v >= 0)) return toast('Enter a daily rate of ₱0 or more.', true);
+    try { await q(sb.from('profiles').update({ daily_rate: v || 0 }).eq('id', el.dataset.id)); const p = S.profiles.find(x => x.id === el.dataset.id); if (p) p.daily_rate = v || 0; toast('Daily rate saved.'); } catch(err){ toast(errMsg(err), true); }
+    return; }
   if (k === 'role' || k === 'staffbranch'){
     const p = S.profiles.find(x => x.id === el.dataset.id);
     const patch = k === 'role' ? { role:el.value } : { branch_id:Number(el.value) || null };
     if (k === 'role' && el.value === 'sales' && !p.branch_id) patch.branch_id = curBranch() || activeBranches()[0]?.id || null;
     try { await q(sb.from('profiles').update(patch).eq('id', p.id)); toast(k === 'role' ? 'Role updated.' : 'Branch updated.'); viewStaff(); } catch(err){ toast(errMsg(err), true); }
   }
+});
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.pf) return payInput(el);
+  if (el.dataset.den){ if (el.dataset.den === 'turn') S.clTurnDirty = true; return updateClose(); }
 });
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && S.me){ S.me = null; showAuth(); } });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
